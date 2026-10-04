@@ -1,0 +1,51 @@
+skill,resource,type,url
+python,Python Documentation,Documentation,https://docs.python.org/3/
+numpy,NumPy Documentation,Documentation,https://numpy.org/doc/
+pandas,Pandas Documentation,Documentation,https://pandas.pydata.org/docs/
+matplotlib,Matplotlib Documentation,Documentation,https://matplotlib.org/stable/
+seaborn,Seaborn Documentation,Documentation,https://seaborn.pydata.org/
+statistics,Khan Academy: Statistics & Probability,Course,https://www.khanacademy.org/math/statistics-probability
+machine learning,Scikit-learn User Guide,Documentation,https://scikit-learn.org/stable/user_guide.html
+scikit learn,Scikit-learn User Guide,Documentation,https://scikit-learn.org/stable/user_guide.html
+deep learning,Deep Learning Specialization,Course,https://www.deeplearning.ai/courses/deep-learning-specialization/
+tensorflow,TensorFlow Tutorials,Tutorial,https://www.tensorflow.org/tutorials
+pytorch,PyTorch Tutorials,Tutorial,https://docs.pytorch.org/tutorials/
+keras,Keras Guides,Documentation,https://keras.io/guides/
+natural language processing,Hugging Face NLP Course,Course,https://huggingface.co/learn/nlp-course
+computer vision,OpenCV Tutorials,Tutorial,https://docs.opencv.org/4.x/d9/df8/tutorial_root.html
+sql,PostgreSQL Tutorial,Tutorial,https://www.postgresql.org/docs/current/tutorial.html
+mysql,MySQL Documentation,Documentation,https://dev.mysql.com/doc/
+mongodb,MongoDB University,Course,https://learn.mongodb.com/
+data analysis,Kaggle Learn: Data Visualization,Course,https://www.kaggle.com/learn
+data science,IBM: Data Science Learning,Course,https://www.coursera.org/professional-certificates/ibm-data-science
+power bi,Microsoft Learn: Power BI,Course,https://learn.microsoft.com/en-us/training/powerplatform/power-bi/
+tableau,Tableau Learning,Course,https://www.tableau.com/learn
+git,Git Documentation,Documentation,https://git-scm.com/doc
+github,GitHub Skills,Course,https://skills.github.com/
+docker,Docker Get Started,Tutorial,https://docs.docker.com/get-started/
+aws,AWS Documentation,Documentation,https://docs.aws.amazon.com/
+rest apis,MDN HTTP Overview,Documentation,https://developer.mozilla.org/en-US/docs/Web/HTTP/Overview
+flask,Flask Documentation,Documentation,https://flask.palletsprojects.com/
+django,Django Documentation,Documentation,https://docs.djangoproject.com/en/stable/
+react,React Learn,Course,https://react.dev/learn
+javascript,MDN JavaScript Guide,Documentation,https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide
+html,MDN HTML,Documentation,https://developer.mozilla.org/en-US/docs/Web/HTML
+css,MDN CSS,Documentation,https://developer.mozilla.org/en-US/docs/Web/CSS
+java,Dev.java,Documentation,https://dev.java/learn/
+c++,Learn C++,Tutorial,https://www.learncpp.com/
+salesforce,Salesforce Developer Documentation,Documentation,https://developer.salesforce.com/docs
+apex,Apex Developer Guide,Documentation,https://developer.salesforce.com/docs/atlas.en-us.apexcode.meta/apexcode/
+soap apis,Salesforce SOAP API Developer Guide,Documentation,https://developer.salesforce.com/docs/atlas.en-us.api.meta/api/
+communication,Coursera: Improving Communication Skills,Course,https://www.coursera.org/learn/communication-skills
+leadership,Coursera: Leadership Skills,Course,https://www.coursera.org/learn/leadership-skills
+time management,"Coursera: Work Smarter, Not Harder",Course,https://www.coursera.org/learn/work-smarter-not-harder
+agile software development,Atlassian Agile Coach,Guide,https://www.atlassian.com/agile
+devops principles,Microsoft Learn: DevOps,Course,https://learn.microsoft.com/en-us/training/paths/devops/
+software quality assurance,ISTQB Foundation Level,Certification,https://www.istqb.org/certifications/certified-tester-foundation-level
+system testing tools,Guru99 Software Testing Tutorial,Tutorial,https://www.guru99.com/software-testing.html
+application design and architecture,Microsoft Architecture Center,Guide,https://learn.microsoft.com/en-us/azure/architecture/
+system migrations,AWS Migration Hub,Guide,https://aws.amazon.com/migration-hub/
+creativity,IDEO Design Thinking,Guide,https://designthinking.ideo.com/
+flexibility,LinkedIn Learning: Adaptability,Course,https://www.linkedin.com/learning/topics/adaptability
+openai api,OpenAI API Documentation,Official Documentation,https://platform.openai.com/docs
+huggingface,Hugging Face Course,Official Course,https://huggingface.co/learn

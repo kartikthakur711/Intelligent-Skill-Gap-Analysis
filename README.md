@@ -92,9 +92,3 @@ The system then displays:
 ## Current Status
 
 The project has a working prototype and the complete basic flow has been tested using the Machine Learning Engineer role.
-
-## Team Members
-
-- Kartik Thakur — Registration No. 12610308 — Roll No. 52
-- Aniket Shrivastav — Roll No. 4
-- Akshat — Roll No. 51

@@ -5,6 +5,10 @@ on:
     branches:
       - main
       - 'feature/*'
+    paths:
+      - '.github/workflows/daily-job-data.yml'
+      - 'data_pipeline/**'
+      - 'job_catalog.csv'
   schedule:
     - cron: "17 2 * * *"
   workflow_dispatch:

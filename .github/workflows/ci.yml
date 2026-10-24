@@ -1,0 +1,26 @@
+name: Project checks
+
+on:
+  push:
+    branches:
+      - main
+      - 'feature/*'
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Run offline tests
+        run: python -B -m unittest discover -s data_pipeline -p 'test_*.py' -v
+      - name: Check Python syntax
+        run: python -B -c "import ast, pathlib; files = [pathlib.Path('app.py'), pathlib.Path('app_helpers.py'), *pathlib.Path('data_pipeline').glob('*.py')]; [ast.parse(p.read_text(encoding='utf-8')) for p in files]; print('Python syntax OK')"

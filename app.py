@@ -14,6 +14,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 from data_pipeline.skill_demand import load_headcount_demand as read_headcount_demand
 from data_pipeline.skill_demand import recent_skill_counts
+from app_helpers import clean_html
 
 
 APP_DIR = Path(__file__).resolve().parent
@@ -59,21 +60,6 @@ def normalize_skill(skill):
         "r or java": "r or java",
     }
     return aliases.get(skill, skill)
-
-
-def clean_html(text):
-    """Remove HTML tags and decode HTML entities."""
-    text = str(text)
-    text = re.sub(r"<[^>]+>", " ", text)
-    text = re.sub(r"\\s+", " ", text)
-
-    try:
-        from html import unescape
-        text = unescape(text)
-    except Exception:
-        pass
-
-    return text.strip()
 
 
 def parse_list(value):

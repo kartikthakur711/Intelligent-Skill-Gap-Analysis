@@ -45,6 +45,12 @@ class ExplainabilityTests(unittest.TestCase):
         self.assertIn("2 loaded catalog rows", result.loc["Python", "Reason"])
         self.assertEqual(result.loc["Rust", "Priority"], "Low")
 
+    def test_priority_uses_app_skill_aliases(self):
+        catalog = pd.DataFrame({"skills_list": [["tensorflow keras"], ["mysql database"]]})
+        result = priority_from_demand(["tensorflow", "mysql"], catalog).set_index("Skill")
+        self.assertEqual(result.loc["tensorflow", "Catalog Rows"], 1)
+        self.assertEqual(result.loc["mysql", "Catalog Rows"], 1)
+
     def test_missing_demand_data_is_marked_unknown(self):
         result = priority_from_demand(["Python"], pd.DataFrame())
         self.assertEqual(result.loc[0, "Priority"], "Unknown")

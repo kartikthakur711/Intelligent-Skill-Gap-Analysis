@@ -88,13 +88,12 @@ The Streamlit application displays:
 
 ## Daily Data Pipeline
 
-A daily Headcount Labs workflow fetches current, non-stale India listings updated in the previous 48 hours, up to 250 distinct jobs. It uses descriptions in memory to count mentions of skills already present in the catalog taxonomy. It publishes only category/skill counts with a time window; source descriptions and personal details are never written to the repository.
+A daily Headcount Labs workflow fetches current, non-stale India listings updated in the previous 48 hours, up to 250 distinct API records, including records without usable text. It uses descriptions in memory to count mentions of skills already present in the catalog taxonomy. It publishes category/skill counts and a JSON run summary with record, processing, and time-window metadata; source descriptions and personal details are never written to the repository.
 
-The Streamlit app shows those counts as a supplementary recent-listing signal beside its existing catalog demand. The trained model and job_catalog.csv remain unchanged. The workflow stores its aggregate in data_pipeline/headcount_skill_demand.csv, runs the importer tests, and uploads a 14-day artifact. If the API request or safety checks fail, the existing app catalog remains available.
+The Streamlit app shows those counts as a supplementary recent-listing signal beside its existing catalog demand. The trained model and job_catalog.csv remain unchanged. The workflow stores the aggregate in data_pipeline/headcount_skill_demand.csv and its metadata in data_pipeline/headcount_skill_demand.metadata.json, runs the importer tests, and uploads a 14-day artifact. If the API request or safety checks fail, the existing app catalog remains available.
 
 The first live GitHub Actions run succeeded on 2026-10-24. API use is bounded to 250 delivered records per run; account-level allowances and any other Headcount API usage are shared.
 
 ## Current Status
 
 The app remains a prototype. Its compatibility score is trained against a programmatically generated target, not independently labeled hiring outcomes. The pipeline now adds a fresh, limited-window market signal without retraining the model or replacing the catalog.
-

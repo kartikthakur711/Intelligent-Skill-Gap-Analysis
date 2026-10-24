@@ -1,2 +1,1 @@
 """Job-data pipeline utilities."""
-

@@ -21,6 +21,7 @@ MODEL_FILE = APP_DIR / "resume_job_ml_model.pkl"
 JOB_FILE = APP_DIR / "job_catalog.csv"
 RESOURCE_FILE = APP_DIR / "learning_resources.csv"
 HEADCOUNT_DEMAND_FILE = APP_DIR / "data_pipeline" / "headcount_skill_demand.csv"
+HEADCOUNT_METADATA_FILE = APP_DIR / "data_pipeline" / "headcount_skill_demand.metadata.json"
 
 
 def clean_job_description(text):
@@ -214,7 +215,7 @@ def load_resources():
 
 def load_headcount_demand():
     """Load derived counts only; source postings are never read by the app."""
-    return read_headcount_demand(HEADCOUNT_DEMAND_FILE, normalize_skill)
+    return read_headcount_demand(HEADCOUNT_DEMAND_FILE, normalize_skill, HEADCOUNT_METADATA_FILE)
 
 def extract_resume_skills(resume_text, skill_vocabulary):
     text = resume_text.lower()
@@ -538,13 +539,13 @@ if analyze:
             st.subheader("Prioritized Skill Gap")
             if headcount_metadata:
                 st.caption(
-                    "Recent India listing counts are a supplementary signal from at most 250 distinct postings, "
-                    f"processed {headcount_metadata['generated_at_utc']} UTC. Catalog demand still determines priority."
+                    f"India listing window from {headcount_metadata['window_start_utc']} UTC; "
+                    f"{headcount_metadata['api_records']} API records, {headcount_metadata['processed_jobs']} usable descriptions. "
+                    f"Generated {headcount_metadata['generated_at_utc']} UTC. Catalog demand still determines priority."
+                    + (" No listings matched this window." if int(headcount_metadata.get("api_records", "0")) == 0 else (f" No known catalog skills matched among {headcount_metadata['processed_jobs']} usable listings." if not headcount_rows else ""))
                 )
             elif recent_counts is None:
                 st.caption("Daily India listing data is not available yet; priorities use the existing catalog.")
-            elif not headcount_rows:
-                st.caption("No skill matches were found in the latest India listing window.")
             st.dataframe(priority_df, use_container_width=True, hide_index=True)
 
         st.subheader("Personalized Learning Roadmap")
@@ -584,4 +585,3 @@ if analyze:
 
     except Exception as exc:
         st.exception(exc)
-

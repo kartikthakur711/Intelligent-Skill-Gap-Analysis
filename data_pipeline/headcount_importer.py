@@ -120,6 +120,7 @@ def run(
         "limit": str(min(page_size, max_records)),
     }
     jobs: dict[str, tuple[str, str]] = {}
+    seen_job_ids: set[str] = set()
     cursor: str | None = None
     watermark: str | None = None
     while True:
@@ -133,18 +134,21 @@ def run(
             raise RuntimeError("Headcount catalog watermark changed during pagination; rerun the import")
         for job in payload["data"]:
             job_id = str(job.get("job_id") or "").strip()
+            if not job_id:
+                raise RuntimeError("Headcount returned a job without job_id; refusing an uncountable import")
+            seen_job_ids.add(job_id)
+            if len(seen_job_ids) > max_records:
+                raise RuntimeError(f"Import exceeded the safety cap of {max_records} unique API records")
             title = field_value(job.get("title"))
             description = field_value(job.get("description"))
-            if not job_id or not title or not description:
+            if not title or not description:
                 continue
             jobs[job_id] = (title, description)
-            if len(jobs) > max_records:
-                raise RuntimeError(f"Import exceeded the safety cap of {max_records} unique jobs")
         cursor = payload.get("next_cursor")
         if not cursor:
             break
-        if len(jobs) >= max_records:
-            raise RuntimeError(f"Import exceeded the safety cap of {max_records} unique jobs")
+        if len(seen_job_ids) >= max_records:
+            raise RuntimeError(f"Import reached the safety cap of {max_records} unique API records with more pages remaining")
         time.sleep(sleep_seconds)
 
     counts: Counter[tuple[str, str]] = Counter()
@@ -166,8 +170,16 @@ def run(
                 "generated_at_utc": generated_at,
             })
     temporary_path.replace(output_path)
+    metadata = {"generated_at_utc": generated_at, "window_start_utc": updated_since, "snapshot_watermark": watermark or "", "api_records": len(seen_job_ids), "processed_jobs": len(jobs), "category_skill_pairs": len(counts), "max_records": max_records}
+    metadata_path = output_path.with_suffix(".metadata.json")
+    metadata_temporary_path = metadata_path.with_suffix(metadata_path.suffix + ".tmp")
+    with metadata_temporary_path.open("w", encoding="utf-8") as handle:
+        json.dump(metadata, handle, sort_keys=True)
+        handle.write("\n")
+    metadata_temporary_path.replace(metadata_path)
     return {
-        "unique_jobs": len(jobs),
+        "unique_jobs": len(seen_job_ids),
+        "processed_jobs": len(jobs),
         "category_skill_pairs": len(counts),
         "snapshot_watermark": watermark or "",
         "generated_at_utc": generated_at,
@@ -193,4 +205,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

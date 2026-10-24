@@ -47,6 +47,10 @@ class HeadcountImporterTests(unittest.TestCase):
         self.assertIn(",1", content)
         self.assertIn("window_start_utc", content)
         self.assertIn("generated_at_utc", content)
+        metadata = json.loads(self.output.with_suffix(".metadata.json").read_text(encoding="utf-8"))
+        self.assertEqual(metadata["api_records"], 1)
+        self.assertEqual(metadata["processed_jobs"], 1)
+        self.assertNotIn("private source text", json.dumps(metadata))
 
     def test_fails_when_cap_would_truncate_a_page_walk(self):
         page = {"data": [{"job_id": str(n), "title": "Engineer", "description": "Python"} for n in range(2)], "next_cursor": "opaque", "snapshot_watermark": "w"}
@@ -54,6 +58,22 @@ class HeadcountImporterTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "safety cap"):
                 importer.run(self.catalog, self.output, api_key="unused-test-token", updated_since="2026-10-22T00:00:00Z", max_records=1)
         self.assertFalse(self.output.exists())
+
+    def test_cap_counts_records_even_without_usable_descriptions(self):
+        page = {"data": [{"job_id": str(n), "title": "", "description": ""} for n in range(2)], "next_cursor": None, "snapshot_watermark": "w"}
+        with patch.object(importer, "request_page", return_value=page):
+            with self.assertRaisesRegex(RuntimeError, "safety cap"):
+                importer.run(self.catalog, self.output, api_key="unused-test-token", updated_since="2026-10-22T00:00:00Z", max_records=1)
+        self.assertFalse(self.output.exists())
+
+    def test_reader_keeps_metadata_for_header_only_aggregate(self):
+        self.output.parent.mkdir(parents=True, exist_ok=True)
+        self.output.write_text(",".join(importer.OUTPUT_COLUMNS) + "\n", encoding="utf-8")
+        metadata = {"generated_at_utc": "now", "window_start_utc": "then", "api_records": 2, "processed_jobs": 0, "category_skill_pairs": 0}
+        self.output.with_suffix(".metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+        rows, loaded = load_headcount_demand(self.output, importer.normalize)
+        self.assertEqual(rows, [])
+        self.assertEqual(loaded["api_records"], "2")
 
     def test_requires_secret_without_showing_it(self):
         with self.assertRaisesRegex(ValueError, "HEADCOUNT_API_KEY is required"):
@@ -68,6 +88,7 @@ class HeadcountImporterTests(unittest.TestCase):
             "Data,Python,2,2026-10-22T00:00:00Z,2026-10-24T00:00:00Z\n",
             encoding="utf-8",
         )
+        aggregate.with_suffix(".metadata.json").write_text(json.dumps({"generated_at_utc":"2026-10-24T00:00:00Z", "window_start_utc":"2026-10-22T00:00:00Z", "api_records":2, "processed_jobs":2, "category_skill_pairs":1}), encoding="utf-8")
         rows, metadata = load_headcount_demand(aggregate, importer.normalize)
         self.assertEqual(recent_skill_counts(rows), {"python": 3})
         self.assertEqual(metadata["generated_at_utc"], "2026-10-24T00:00:00Z")
@@ -80,4 +101,3 @@ class HeadcountImporterTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

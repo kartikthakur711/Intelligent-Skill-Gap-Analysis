@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import csv
+import json
 from pathlib import Path
 from typing import Callable
 
@@ -15,24 +16,24 @@ REQUIRED_COLUMNS = {
 
 
 def load_headcount_demand(
-    path: Path, normalize_skill: Callable[[str], str]
+    path: Path, normalize_skill: Callable[[str], str], metadata_path: Path | None = None
 ) -> tuple[list[dict[str, str]] | None, dict[str, str] | None]:
     """Return aggregate rows and generation metadata, or (None, None) if unavailable."""
-    if not path.exists():
+    metadata_path = metadata_path or path.with_suffix(".metadata.json")
+    if not path.exists() or not metadata_path.exists():
         return None, None
     try:
+        with metadata_path.open("r", encoding="utf-8") as handle:
+            metadata = json.load(handle)
+        required_metadata = {"generated_at_utc", "window_start_utc", "api_records", "processed_jobs", "category_skill_pairs"}
+        if not isinstance(metadata, dict) or not required_metadata.issubset(metadata):
+            return None, None
         with path.open("r", encoding="utf-8-sig", newline="") as handle:
             reader = csv.DictReader(handle)
             if not REQUIRED_COLUMNS.issubset(reader.fieldnames or []):
                 return None, None
             rows = []
-            metadata = None
             for row in reader:
-                if metadata is None:
-                    metadata = {
-                        "generated_at_utc": str(row.get("generated_at_utc") or ""),
-                        "window_start_utc": str(row.get("window_start_utc") or ""),
-                    }
                 skill = normalize_skill(row.get("skill", ""))
                 try:
                     count = max(0, int(float(row.get("distinct_job_count", "0"))))
@@ -44,8 +45,8 @@ def load_headcount_demand(
                         "skill_normalized": skill,
                         "distinct_job_count": str(count),
                     })
-            return rows, metadata if rows else None
-    except (OSError, csv.Error, UnicodeError):
+            return rows, {str(k): str(v) for k, v in metadata.items()}
+    except (OSError, csv.Error, UnicodeError, json.JSONDecodeError):
         return None, None
 
 
@@ -58,4 +59,3 @@ def recent_skill_counts(rows: list[dict[str, str]] | None) -> dict[str, int] | N
         key = row["skill_normalized"]
         counts[key] = max(counts.get(key, 0), int(row["distinct_job_count"]))
     return counts
-

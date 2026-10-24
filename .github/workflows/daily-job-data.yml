@@ -17,10 +17,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: feature/daily-job-data-pipeline
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Build bounded aggregate
@@ -28,9 +28,10 @@ jobs:
           HEADCOUNT_API_KEY: ${{ secrets.HEADCOUNT_API_KEY }}
         run: python data_pipeline/headcount_importer.py --catalog job_catalog.csv --output build/headcount_skill_demand.csv --max-records 250
       - name: Upload aggregate
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: india-skill-demand-${{ github.run_id }}
           path: build/headcount_skill_demand.csv
           if-no-files-found: error
           retention-days: 14
+

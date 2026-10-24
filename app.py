@@ -508,6 +508,7 @@ if analyze:
 
         c1, c2, c3 = st.columns(3)
         c1.metric("ML Compatibility", f"{compatibility:.1f}%")
+        st.caption("Prototype estimate trained on constructed compatibility scores; it is not a hiring probability or prediction of interview success.")
         c2.metric("Matched Skills", f"{len(matched)} / {len(job_skills)}")
         c3.metric("Missing Skills", len(missing))
 

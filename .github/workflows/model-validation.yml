@@ -1,6 +1,7 @@
 name: Model and app validation
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - feature/daily-job-data-pipeline

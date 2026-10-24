@@ -24,7 +24,7 @@ from urllib.request import Request, urlopen
 API_BASE = "https://api.headcountlabs.com"
 FIELDS = "job_id,title,description"
 APP_COLUMNS = ("job_id", "category", "job_title", "job_description", "job_skill_set")
-OUTPUT_COLUMNS = ("category", "skill", "distinct_job_count")
+OUTPUT_COLUMNS = ("category", "skill", "distinct_job_count", "window_start_utc", "generated_at_utc")
 
 
 def normalize(value: object) -> str:
@@ -109,6 +109,7 @@ def run(
     if not 1 <= page_size <= 250:
         raise ValueError("page_size must be between 1 and 250")
     taxonomy = load_taxonomy(catalog_path)
+    generated_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     params = {
         "country": "IN",
         "currentness": "current",
@@ -157,9 +158,20 @@ def run(
         writer = csv.DictWriter(handle, fieldnames=OUTPUT_COLUMNS)
         writer.writeheader()
         for (category, skill), count in sorted(counts.items()):
-            writer.writerow({"category": category, "skill": skill, "distinct_job_count": count})
+            writer.writerow({
+                "category": category,
+                "skill": skill,
+                "distinct_job_count": count,
+                "window_start_utc": updated_since,
+                "generated_at_utc": generated_at,
+            })
     temporary_path.replace(output_path)
-    return {"unique_jobs": len(jobs), "category_skill_pairs": len(counts), "snapshot_watermark": watermark or ""}
+    return {
+        "unique_jobs": len(jobs),
+        "category_skill_pairs": len(counts),
+        "snapshot_watermark": watermark or "",
+        "generated_at_utc": generated_at,
+    }
 
 
 def main() -> int:
@@ -181,3 +193,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

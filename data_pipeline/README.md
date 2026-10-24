@@ -1,3 +1,4 @@
+Warning: fs was declared with const; use let for reassignable variables.
 # Daily Job Data Pipeline
 
 This folder contains the catalog quality utilities and a bounded Headcount Labs importer.
@@ -27,3 +28,4 @@ This folder contains the catalog quality utilities and a bounded Headcount Labs 
 
 Headcount Labs documentation was checked on 2026-10-24. It documents bearer-key authentication, GET /v1/jobs, country IN, updated_since, currentness and stale filters, selected fields, and opaque next_cursor pagination. Terms permit analytics subject to third-party rights; the open-data licence does not grant rights to job-board text or personal data. The live API key and importer were verified by a successful Actions run on 2026-10-24. The daily schedule is 02:17 UTC (07:47 India time). The 250-record cap bounds each run; API allowance remains shared at the account level.
 
+The importer publishes a sibling `.metadata.json` file with API record count, usable-description count, taxonomy match count, time window, snapshot watermark and cap. It contains no posting text. The app requires both the aggregate CSV and metadata so an empty aggregate can be distinguished from a stale or missing run.

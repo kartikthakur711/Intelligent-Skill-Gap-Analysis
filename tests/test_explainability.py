@@ -40,15 +40,15 @@ class ExplainabilityTests(unittest.TestCase):
     def test_skill_priority_has_verified_count_rationale(self):
         catalog = pd.DataFrame({"skills_list": [["Python", "SQL"], ["python"], ["SQL"]]})
         result = priority_from_demand(["Python", "SQL", "Rust"], catalog).set_index("Skill")
-        self.assertEqual(result.loc["Python", "Job Demand"], 2)
+        self.assertEqual(result.loc["Python", "Catalog Rows"], 2)
         self.assertEqual(result.loc["SQL", "Priority"], "High")
-        self.assertIn("2 loaded job postings", result.loc["Python", "Reason"])
+        self.assertIn("2 loaded catalog rows", result.loc["Python", "Reason"])
         self.assertEqual(result.loc["Rust", "Priority"], "Low")
 
     def test_missing_demand_data_is_marked_unknown(self):
         result = priority_from_demand(["Python"], pd.DataFrame())
         self.assertEqual(result.loc[0, "Priority"], "Unknown")
-        self.assertEqual(result.loc[0, "Job Demand"], 0)
+        self.assertEqual(result.loc[0, "Catalog Rows"], 0)
         self.assertIn("unavailable", result.loc[0, "Reason"])
 
 

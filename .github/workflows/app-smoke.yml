@@ -1,0 +1,69 @@
+name: App runtime smoke check
+
+on:
+  push:
+    branches:
+      - main
+      - 'feature/*'
+    paths:
+      - 'app.py'
+      - 'app_helpers.py'
+      - 'requirements.txt'
+      - 'resume_job_ml_model.pkl'
+      - 'job_catalog.csv'
+      - '.github/workflows/app-smoke.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'app.py'
+      - 'app_helpers.py'
+      - 'requirements.txt'
+      - 'resume_job_ml_model.pkl'
+      - 'job_catalog.csv'
+      - '.github/workflows/app-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  app-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install app smoke dependencies
+        run: python -m pip install streamlit pandas numpy scikit-learn joblib
+      - name: Load model and catalog
+        run: |
+          python - <<'PY'
+          import joblib
+          import numpy as np
+          import pandas as pd
+
+          artifacts = joblib.load("resume_job_ml_model.pkl")
+          assert {"model", "vectorizer"} <= set(artifacts)
+          vectorizer = artifacts["vectorizer"]
+          assert vectorizer.transform(["Python and data analysis"]).shape[0] == 1
+          prediction = float(artifacts["model"].predict(np.zeros((1, 5)))[0])
+          assert np.isfinite(prediction)
+
+          catalog = pd.read_csv("job_catalog.csv")
+          required = {"job_id", "category", "job_title", "job_description", "job_skill_set"}
+          assert required <= set(catalog.columns)
+          assert not catalog.empty
+          print(f"Model smoke passed; catalog rows: {len(catalog)}")
+          PY
+      - name: Render initial app screen
+        run: |
+          python - <<'PY'
+          from streamlit.testing.v1 import AppTest
+
+          app = AppTest.from_file("app.py").run(timeout=60)
+          assert not app.exception, [exception.message for exception in app.exception]
+          assert any("Intelligent Skill Gap Analysis" in title.value for title in app.title)
+          print("Initial app render passed")
+          PY

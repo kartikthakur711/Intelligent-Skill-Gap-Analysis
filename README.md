@@ -30,6 +30,42 @@ Resume
 - Learning-resource links
 - Streamlit web application
 
+## Run Locally
+
+Use Python 3.11 (Python 3.10 or newer is required). From the repository folder, create and activate a virtual environment, then install the dependencies.
+
+**Windows PowerShell**
+
+```powershell
+py -3.11 -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+**macOS or Linux**
+
+```sh
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+Start the application from the repository folder:
+
+```sh
+python -m streamlit run app.py
+```
+
+The app uses the included model, job catalog and learning resources. On first analysis, Sentence Transformers downloads the `all-MiniLM-L6-v2` model, so the first run needs internet access. Upload a PDF, DOCX or TXT resume and enter a target job title. The app itself does not need the Headcount API key; the daily GitHub Actions pipeline uses its configured repository secret.
+
+To run the pipeline offline tests locally:
+
+```sh
+python -B -m unittest discover -s data_pipeline -p 'test_*.py' -v
+```
+
 ## Dataset
 
 The GitHub repository currently contains a **3,200-row job catalog**, including approximately **1,000 Machine Learning Engineer rows**. This is the repository's compact catalog, not the separate 100,000-row catalog previously used in the development environment.

@@ -1,4 +1,3 @@
-Warning: fs was declared with const; use let for reassignable variables.
 #!/usr/bin/env python3
 """Build aggregate skill demand from a bounded Headcount Labs India query.
 

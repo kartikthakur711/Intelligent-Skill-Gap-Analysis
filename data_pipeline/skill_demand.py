@@ -1,4 +1,3 @@
-Warning: fs was declared with const; use let for reassignable variables.
 """Read the aggregate skill-demand file without loading source job text."""
 from __future__ import annotations
 

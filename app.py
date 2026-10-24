@@ -1,4 +1,3 @@
-Warning: fs was declared with const; use let for reassignable variables.
 import ast
 import difflib
 import io
@@ -547,11 +546,6 @@ if analyze:
                 )
             elif recent_counts is None:
                 st.caption("Daily India listing data is not available yet; priorities use the existing catalog.")
-            elif not headcount_rows:
-                if int(headcount_metadata.get("api_records", "0")) == 0:
-                    st.caption("No India listings matched the latest update window.")
-                else:
-                    st.caption(f"No known catalog skills matched among {headcount_metadata['processed_jobs']} usable listings in the latest India window.")
             st.dataframe(priority_df, use_container_width=True, hide_index=True)
 
         st.subheader("Personalized Learning Roadmap")

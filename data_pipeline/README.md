@@ -1,4 +1,3 @@
-Warning: fs was declared with const; use let for reassignable variables.
 # Daily Job Data Pipeline
 
 This folder contains the catalog quality utilities and a bounded Headcount Labs importer.

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import csv
 import json
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
@@ -46,14 +45,7 @@ def load_headcount_demand(
                         "skill_normalized": skill,
                         "distinct_job_count": str(count),
                     })
-            loaded = {str(k): str(v) for k, v in metadata.items()}
-            try:
-                watermark = datetime.fromisoformat(str(metadata.get("snapshot_watermark", "")).replace("Z", "+00:00"))
-                window_start = datetime.fromisoformat(str(metadata["window_start_utc"]).replace("Z", "+00:00"))
-                loaded["snapshot_before_window"] = str(watermark.astimezone(timezone.utc) < window_start.astimezone(timezone.utc))
-            except (TypeError, ValueError):
-                loaded["snapshot_before_window"] = "False"
-            return rows, loaded
+            return rows, {str(k): str(v) for k, v in metadata.items()}
     except (OSError, csv.Error, UnicodeError, json.JSONDecodeError):
         return None, None
 

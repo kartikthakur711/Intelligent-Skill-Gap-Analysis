@@ -77,7 +77,6 @@ class HeadcountImporterTests(unittest.TestCase):
         rows, loaded = load_headcount_demand(self.output, importer.normalize)
         self.assertEqual(rows, [])
         self.assertEqual(loaded["api_records"], "2")
-        self.assertEqual(loaded["snapshot_before_window"], "True")
 
     def test_retries_transient_gateway_timeout_without_leaking_response(self):
         error = HTTPError("https://api.example.invalid", 504, "timeout", {}, None)

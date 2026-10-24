@@ -542,7 +542,6 @@ if analyze:
                     f"India listing window from {headcount_metadata['window_start_utc']} UTC; "
                     f"{headcount_metadata['api_records']} API records, {headcount_metadata['processed_jobs']} usable descriptions. "
                     f"Generated {headcount_metadata['generated_at_utc']} UTC. Catalog demand still determines priority."
-                    + (" Provider snapshot predates this window, so zero counts may reflect source freshness." if headcount_metadata.get("snapshot_before_window") == "True" else "")
                     + (" No listings matched this window." if int(headcount_metadata.get("api_records", "0")) == 0 else (f" No known catalog skills matched among {headcount_metadata['processed_jobs']} usable listings." if not headcount_rows else ""))
                 )
             elif recent_counts is None:

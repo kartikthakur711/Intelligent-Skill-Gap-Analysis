@@ -29,4 +29,4 @@ Headcount Labs documentation was checked on 2026-10-24. It documents bearer-key 
 
 The importer publishes a sibling `.metadata.json` file with API record count, usable-description count, taxonomy match count, time window, snapshot watermark and cap. It contains no posting text. The app requires both the aggregate CSV and metadata so an empty aggregate can be distinguished from a stale or missing run.
 
-The 48-hour demand window uses the source publication date (`posted_since`), matching the app’s recent-listing label. The app also notes when the Headcount snapshot watermark predates that window; Headcount does not guarantee when source changes appear in its catalog.
+The 48-hour demand window uses the source publication date (`posted_since`), matching the app’s recent-listing label. The importer retains the provider snapshot watermark for run diagnosis; Headcount does not guarantee when source changes appear in its catalog.

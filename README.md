@@ -1,106 +1,60 @@
 # Intelligent Skill Gap Analysis
 
-## Project Overview
+A Streamlit prototype that compares resume text with a selected job from a bundled catalog, estimates a compatibility score with a saved regression model, identifies skill gaps, and suggests a learning sequence and resources.
 
-This project is an Intelligent Skill Gap Analysis and Personalized Learning Recommendation System.
+This repository contains both the app and a separate daily skill-demand aggregation workflow. The daily artifact does not update the app catalog or retrain the model.
 
-The system compares a user's resume with a target job and identifies matched and missing skills. It then prioritizes skill gaps and creates a personalized learning roadmap with learning resources.
+## Architecture and workflow
 
-## Project Flow
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the component diagram, data flow, and GitHub Actions behavior.
 
-Resume
-→ Resume Skill Extraction
-→ Target Job Title
-→ Job Description Dataset
-→ Required Skill Extraction
-→ ML Compatibility Prediction
-→ Matched / Missing Skills
-→ Skill Prioritization
-→ Personalized Learning Roadmap
-→ Learning Resources
+## Run locally
 
-## Main Features
+Requires Python 3.11 (the validation and daily-data workflows use Python 3.11). From the repository root:
 
-- Resume upload and skill extraction
-- Job-title-based job retrieval
-- Resume-job skill matching
-- ML-based compatibility score
-- Missing-skill identification and prioritization
-- Personalized learning roadmap
-- Learning-resource links
-- Streamlit web application
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+streamlit run app.py
+```
 
-## Dataset
+Open the local URL printed by Streamlit. Upload a text-based PDF, DOCX, or TXT resume and enter a target job title. The app loads `job_catalog.csv`, `learning_resources.csv`, and `resume_job_ml_model.pkl` from the repository directory. If the catalog or resources file is absent, the app has fallback behavior: it downloads the Hugging Face job dataset for the catalog, or uses a small in-code resource list. Sentence Transformers loads `all-MiniLM-L6-v2` on first use, which may require network access and downloads the model into the local model cache.
 
-The GitHub repository currently contains a **3,200-row job catalog**, including approximately **1,000 Machine Learning Engineer rows**. This is the repository's compact catalog, not the separate 100,000-row catalog previously used in the development environment.
+The saved model is a runtime artifact. Normal app use and validation do not train or save a replacement model.
 
-Important data-quality note: the catalog contains repeated/template job descriptions and skill combinations. Row count must not be interpreted as the number of distinct real-world job vacancies. The daily data pipeline in `data_pipeline/` adds deduplication and quality-reporting foundations before any refreshed data is used by the app.
+## Dependencies
 
-The app-compatible catalog columns are:
+Install the versions/ranges declared in [`requirements.txt`](requirements.txt): Streamlit, Pandas, NumPy, scikit-learn (pinned to 1.6.1 for saved-artifact compatibility), Joblib, Sentence Transformers, Hugging Face Datasets, pypdf, and python-docx. The daily importer uses the Python standard library; its workflow does not install the full app requirements. CI installs the smaller set needed for model/app validation.
 
-- `job_id`
-- `category`
-- `job_title`
-- `job_description`
-- `job_skill_set`
+## Data and configuration
 
-## Machine Learning Model
+The checked-in `job_catalog.csv` has 3,200 rows and the app uses `job_id`, `category`, `job_title`, `job_description`, and `job_skill_set`. Repeated/template rows and skill combinations exist, so row count is not a count of distinct vacancies. The app's displayed gap priority is based on skill frequency across catalog rows; it is not distinct-posting demand and does not use the Headcount artifact.
 
-The current experiment uses a Gradient Boosting Regressor for compatibility-score prediction.
+The optional daily workflow is configured in [`.github/workflows/daily-job-data.yml`](.github/workflows/daily-job-data.yml). It calls the bounded Headcount Labs importer for current India postings updated in the prior 48 hours, processes at most 250 unique job IDs per run, and matches title/description text against the existing catalog skill taxonomy. It requires the GitHub Actions secret `HEADCOUNT_API_KEY`. The workflow writes only `category`, `skill`, and `distinct_job_count` aggregates to a GitHub Actions artifact retained for 14 days; fetched posting text is not written to the artifact or committed. The pipeline does not refresh `job_catalog.csv`, feed its output into the app, or retrain the model. More details and limits are in [`data_pipeline/README.md`](data_pipeline/README.md).
 
-Reported evaluation on the experiment dataset:
+## Model and evaluation limits
 
-- MAE: 9.3385
-- RMSE: 12.2061
-- R²: 0.7536
+The saved model is a Gradient Boosting Regressor using five inputs: resume skill count, job skill count, skill overlap ratio, TF-IDF similarity, and semantic similarity. The notebook reports MAE 9.3385, RMSE 12.2061, and R² 0.7536 on its seeded 80/20 split. The notebook compares Random Forest and Gradient Boosting on the same holdout and selects by holdout MAE, so that split is a model-selection validation set, not an untouched final test set.
 
-Input features include:
+The training target was programmatically generated. These metrics measure agreement with that constructed target and do not establish predictive validity for hiring outcomes or candidate suitability. There is no independent human-labelled holdout in the repository. [`evaluation/README.md`](evaluation/README.md) documents how to collect and evaluate one. `model_evaluation.py` evaluates a supplied independently labelled holdout with the saved model; it never fits or saves a model. Do not treat software checks or app rendering as predictive evaluation.
 
-- Resume skill count
-- Job skill count
-- Skill overlap ratio
-- TF-IDF similarity
-- Semantic similarity
+App limitations include vocabulary-based resume skill extraction, approximate job-title retrieval, and reliance on a small, repetitive catalog. The score is a model estimate, clipped to 0–100 for display; feature attributions explain model behavior and are not causal effects or hiring decisions. Human review is needed before using results for consequential decisions.
 
-**Evaluation limitation:** the training target was derived from programmatically generated compatibility scores rather than independently human-annotated hiring outcomes. These metrics describe agreement with that constructed target; they do not establish real-world hiring prediction accuracy.
+## Testing status
 
-The notebook uses a seeded 80/20 random split (`random_state=42`) and reports metrics after clipping predictions to 0–100. It compares Random Forest and Gradient Boosting on the same holdout and selects the lower-MAE model there, so this split is a model-selection validation set rather than an untouched final test set. The reported values above are the existing project results; CI does not retrain the model or claim to reproduce those metrics.
+The GitHub Actions **Model and app validation** workflow passed run **#2** on commit [`67cd4c5`](https://github.com/kartikthakur711/Intelligent-Skill-Gap-Analysis/commit/67cd4c555a2ec16bf44a5f091535df323e4801a7), as recorded for this phase. The workflow checks the saved model/vectorizer contract, representative finite predictions, additive explanations, holdout metric validation behavior, unit tests, and initial Streamlit rendering. It does not train the model or measure predictive validity. The workflow is triggered manually, on selected app/model/test changes pushed to `feature/daily-job-data-pipeline`, and for matching pull requests targeting `main`.
 
-`model_evaluation.py` evaluates the saved model on an independently labelled holdout with the same clipping and MAE/RMSE/R² definitions. It never fits or saves a model. The `Model and app validation` workflow checks the saved artifact contract, representative finite predictions, additive explanations, holdout metric calculations, and initial Streamlit rendering. An independently labelled holdout is not currently included in the repository, so real-world/generalization performance remains unverified.
+To run checks locally:
 
-New, unlabelled job postings should not trigger model retraining. Retraining should wait until suitable labelled or human-reviewed examples are collected.
+```powershell
+python -B -m unittest discover -s tests -v
+python -B -m unittest discover -s data_pipeline -p 'test_*.py' -v
+```
 
-## Technologies Used
+The initial Streamlit render check is included in the model validation workflow. Live Headcount API access, its credential, and scheduled artifact generation have not been confirmed by the validation run described above.
 
-- Python, Pandas and NumPy
-- Scikit-learn
-- Sentence Transformers
-- Joblib
-- Streamlit
-- Google Colab
+## Deployment
 
-## Application
-
-The Streamlit application displays:
-
-- Compatibility score
-- Matched skills
-- Missing skills
-- Prioritized skill gaps
-- Personalized learning roadmap
-- Learning resources
-
-## Daily Data Pipeline
-
-The daily pipeline is in `data_pipeline/`.
-
-It currently provides:
-- A documented ingestion design and safety rules
-- A catalog deduplication utility
-- A JSON quality report with unique-posting skill counts
-
-The bounded Headcount importer and scheduled GitHub Actions workflow publish aggregate skill-demand artifacts; source descriptions are not included in those outputs. Demand counts guide skill-gap priority only and are not used to retrain the saved model.
-
-## Current Status
-
-The `feature/daily-job-data-pipeline` branch includes the explainability and saved-model validation work. The trained model is validated as a runtime artifact but is not retrained by these checks. The `main` branch and saved model remain unchanged by this phase.
+Deployment is not yet established by this repository. Use the [deployment checklist](docs/DEPLOYMENT_CHECKLIST.md) before exposing the app or enabling the scheduled data workflow. In particular, configure and verify the API secret only if the separate data workflow is needed, and confirm privacy, data rights, hosting, and operational ownership for the intended deployment.

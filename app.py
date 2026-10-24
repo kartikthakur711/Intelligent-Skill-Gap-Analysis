@@ -344,13 +344,15 @@ def choose_job(job_title, catalog, sentence_model=None):
     return None, [], 0.0, "none"
 
 
-def roadmap_for_skills(missing_skills, dependencies):
+def roadmap_for_skills(missing_skills, dependencies, known_skills=None):
+    """Build a prerequisite-aware roadmap without reteaching known skills."""
     result = []
     seen = set()
+    known = {normalize_skill(skill) for skill in (known_skills or [])}
 
     def add(skill):
         key = normalize_skill(skill)
-        if key in seen:
+        if not key or key in seen or key in known:
             return
         for dep in dependencies.get(key, []):
             add(dep)
@@ -481,7 +483,7 @@ if analyze:
             "react": ["javascript", "html", "css"],
             "spring": ["java", "software development"],
         }
-        roadmap = roadmap_for_skills(missing, dependencies)
+        roadmap = roadmap_for_skills(missing, dependencies, resume_skills)
         resources = load_resources()
 
         st.success(f"Analysis completed for **{selected_job['job_title']}**")
@@ -503,9 +505,11 @@ if analyze:
 
         if not priority_df.empty:
             st.subheader("Prioritized Skill Gap")
+            st.caption("Catalog Frequency Score = skill row count divided by the highest skill row count in the loaded catalog. It measures catalog-row frequency, not unique vacancies or hiring probability; repeated/template rows may affect it.")
             st.dataframe(priority_df, use_container_width=True, hide_index=True)
 
         st.subheader("Personalized Learning Roadmap")
+        st.caption("The roadmap focuses on detected skill gaps and skips prerequisites already present in your resume.")
         if roadmap:
             for i, skill in enumerate(roadmap, 1):
                 st.write(f"**{i}. {skill.title()}**")

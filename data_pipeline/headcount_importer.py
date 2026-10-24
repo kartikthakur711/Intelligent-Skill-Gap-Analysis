@@ -69,14 +69,19 @@ def request_page(params: dict[str, str], api_key: str, timeout: int = 30) -> dic
         f"{API_BASE}/v1/jobs?{query}",
         headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
     )
-    try:
-        with urlopen(request, timeout=timeout) as response:
-            payload = json.load(response)
-    except HTTPError as exc:
-        # Never include response text or request headers: either could contain secrets.
-        raise RuntimeError(f"Headcount API returned HTTP {exc.code}") from None
-    except (URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
-        raise RuntimeError(f"Headcount API request failed ({type(exc).__name__})") from None
+    for attempt in range(3):
+        try:
+            with urlopen(request, timeout=timeout) as response:
+                payload = json.load(response)
+            break
+        except HTTPError as exc:
+            # Never include response text or request headers: either could contain secrets.
+            if exc.code in {503, 504} and attempt < 2:
+                time.sleep(attempt + 1)
+                continue
+            raise RuntimeError(f"Headcount API returned HTTP {exc.code}") from None
+        except (URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+            raise RuntimeError(f"Headcount API request failed ({type(exc).__name__})") from None
     if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
         raise RuntimeError("Headcount API returned an unexpected response shape")
     return payload

@@ -2,6 +2,7 @@ import csv
 import json
 import tempfile
 import unittest
+from urllib.error import HTTPError
 from pathlib import Path
 from unittest.mock import patch
 
@@ -77,6 +78,13 @@ class HeadcountImporterTests(unittest.TestCase):
         self.assertEqual(rows, [])
         self.assertEqual(loaded["api_records"], "2")
         self.assertEqual(loaded["snapshot_before_window"], "True")
+
+    def test_retries_transient_gateway_timeout_without_leaking_response(self):
+        error = HTTPError("https://api.example.invalid", 504, "timeout", {}, None)
+        with patch.object(importer, "urlopen", side_effect=[error, error, error]) as request, patch.object(importer.time, "sleep"):
+            with self.assertRaisesRegex(RuntimeError, "HTTP 504"):
+                importer.request_page({"country": "IN"}, "unused-test-token")
+        self.assertEqual(request.call_count, 3)
 
     def test_requires_secret_without_showing_it(self):
         with self.assertRaisesRegex(ValueError, "HEADCOUNT_API_KEY is required"):

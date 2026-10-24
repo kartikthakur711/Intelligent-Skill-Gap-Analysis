@@ -64,6 +64,10 @@ Input features include:
 
 **Evaluation limitation:** the training target was derived from programmatically generated compatibility scores rather than independently human-annotated hiring outcomes. These metrics describe agreement with that constructed target; they do not establish real-world hiring prediction accuracy.
 
+The notebook uses a seeded 80/20 random split (`random_state=42`) and reports metrics after clipping predictions to 0–100. It compares Random Forest and Gradient Boosting on the same holdout and selects the lower-MAE model there, so this split is a model-selection validation set rather than an untouched final test set. The reported values above are the existing project results; CI does not retrain the model or claim to reproduce those metrics.
+
+`model_evaluation.py` evaluates the saved model on an independently labelled holdout with the same clipping and MAE/RMSE/R² definitions. It never fits or saves a model. The `Model and app validation` workflow checks the saved artifact contract, representative finite predictions, additive explanations, holdout metric calculations, and initial Streamlit rendering. An independently labelled holdout is not currently included in the repository, so real-world/generalization performance remains unverified.
+
 New, unlabelled job postings should not trigger model retraining. Retraining should wait until suitable labelled or human-reviewed examples are collected.
 
 ## Technologies Used
@@ -88,15 +92,15 @@ The Streamlit application displays:
 
 ## Daily Data Pipeline
 
-The initial pipeline scaffold is in `data_pipeline/`.
+The daily pipeline is in `data_pipeline/`.
 
 It currently provides:
 - A documented ingestion design and safety rules
 - A catalog deduplication utility
 - A JSON quality report with unique-posting skill counts
 
-No live data provider or scheduled workflow is connected yet. Provider integration will be added only after API access, field mappings, India coverage, usage limits and data terms are confirmed.
+The bounded Headcount importer and scheduled GitHub Actions workflow publish aggregate skill-demand artifacts; source descriptions are not included in those outputs. Demand counts guide skill-gap priority only and are not used to retrain the saved model.
 
 ## Current Status
 
-The project has a working prototype and the basic flow has been tested using the Machine Learning Engineer role. The data pipeline is under development on the `feature/daily-job-data-pipeline` branch; the `main` branch and trained model have not been changed by this work.
+The `feature/daily-job-data-pipeline` branch includes the explainability and saved-model validation work. The trained model is validated as a runtime artifact but is not retrained by these checks. The `main` branch and saved model remain unchanged by this phase.

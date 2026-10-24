@@ -1,0 +1,54 @@
+name: Model and app validation
+
+on:
+  push:
+    branches:
+      - feature/daily-job-data-pipeline
+    paths:
+      - 'app.py'
+      - 'explainability.py'
+      - 'model_evaluation.py'
+      - 'skill_prioritization.py'
+      - 'resume_job_ml_model.pkl'
+      - 'job_catalog.csv'
+      - 'tests/**'
+      - '.github/workflows/model-validation.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'app.py'
+      - 'explainability.py'
+      - 'model_evaluation.py'
+      - 'skill_prioritization.py'
+      - 'resume_job_ml_model.pkl'
+      - 'job_catalog.csv'
+      - 'tests/**'
+      - '.github/workflows/model-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+      - name: Install validation dependencies
+        run: python -m pip install streamlit pandas numpy scikit-learn==1.6.1 joblib
+      - name: Run unit and saved-model validation
+        run: python -B -m unittest discover -s tests -v
+      - name: Render initial app screen
+        run: |
+          python - <<'PY'
+          from streamlit.testing.v1 import AppTest
+
+          app = AppTest.from_file("app.py").run(timeout=60)
+          assert not app.exception, [exception.message for exception in app.exception]
+          assert any("Intelligent Skill Gap Analysis" in title.value for title in app.title)
+          print("Initial app render passed")
+          PY

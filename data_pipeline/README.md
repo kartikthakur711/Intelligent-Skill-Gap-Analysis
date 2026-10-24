@@ -4,25 +4,26 @@ This folder contains the catalog quality utilities and a bounded Headcount Labs 
 
 ## Safety principles
 
-- The existing Streamlit app and trained model are not changed by this pipeline.
+- The model and production catalog stay unchanged; the app may display aggregate daily counts as a supplementary signal.
 - Never treat repeated template rows as distinct job postings.
-- Keep source attribution and source URLs only where the applicable rights permit.
-- Normalize job titles and skill aliases, but send unknown skills to a review queue.
+- Do not collect or persist source URLs or posting-level records in this importer.
+- Match only skills already in the catalog taxonomy; new skills are not added automatically.
 - Calculate skill demand from distinct active postings.
 - Keep source descriptions and job records in memory only; do not publish them from this public repository.
-- Publish only aggregate category/skill counts. The production catalog remains unchanged.
+- Publish only aggregate category/skill counts and window metadata. job_catalog.csv remains unchanged.
 - Do not retrain the compatibility model from unlabelled incoming postings.
 - Do not publish a refreshed catalog until validation checks pass.
 
-## Planned components
+## Pipeline behavior
 
 1. `headcount_importer.py` requests current, non-stale India jobs updated in the preceding 48 hours.
 2. It pages with stable filters and uses a 250 unique-job cap; incomplete/over-cap runs fail.
 3. Existing catalog skills provide the approved taxonomy; descriptions are processed in memory.
-4. The output contains only `category`, `skill`, and `distinct_job_count`, uploaded as a 14-day Actions artifact.
-5. The workflow uses `HEADCOUNT_API_KEY` and never echoes it. It does not commit fetched data or change the app catalog/model.
+4. The output contains category/skill counts plus the update window and generation time; it is uploaded as a 14-day Actions artifact.
+5. The workflow commits only the aggregate file on main. The app reads it as a supplementary recent-listing signal; model scores and job_catalog.csv do not change.
 6. Run offline tests with `python -m unittest discover -s data_pipeline -p 'test_*.py'`.
 
 ## Current status
 
-Headcount Labs documentation was checked on 2026-10-24. It documents bearer-key authentication, `GET /v1/jobs`, country `IN`, `updated_since`, `currentness`, `stale`, selected fields, and opaque `next_cursor` pagination. The importer uses the API only for aggregate skill-demand analysis and writes no source posting text. Headcount's service terms permit analytics subject to third-party rights; its open dataset licence does not cover employer/job-board text or personal data. API credentials, allowance and live response have not been validated by a workflow run. The daily schedule will start only after this workflow is available on the repository's default branch; this feature branch has not been merged.
+Headcount Labs documentation was checked on 2026-10-24. It documents bearer-key authentication, GET /v1/jobs, country IN, updated_since, currentness and stale filters, selected fields, and opaque next_cursor pagination. Terms permit analytics subject to third-party rights; the open-data licence does not grant rights to job-board text or personal data. The live API key and importer were verified by a successful Actions run on 2026-10-24. The daily schedule is 02:17 UTC (07:47 India time). The 250-record cap bounds each run; API allowance remains shared at the account level.
+

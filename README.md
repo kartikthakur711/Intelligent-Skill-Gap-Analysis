@@ -88,15 +88,13 @@ The Streamlit application displays:
 
 ## Daily Data Pipeline
 
-The initial pipeline scaffold is in `data_pipeline/`.
+A daily Headcount Labs workflow fetches current, non-stale India listings updated in the previous 48 hours, up to 250 distinct jobs. It uses descriptions in memory to count mentions of skills already present in the catalog taxonomy. It publishes only category/skill counts with a time window; source descriptions and personal details are never written to the repository.
 
-It currently provides:
-- A documented ingestion design and safety rules
-- A catalog deduplication utility
-- A JSON quality report with unique-posting skill counts
+The Streamlit app shows those counts as a supplementary recent-listing signal beside its existing catalog demand. The trained model and job_catalog.csv remain unchanged. The workflow stores its aggregate in data_pipeline/headcount_skill_demand.csv, runs the importer tests, and uploads a 14-day artifact. If the API request or safety checks fail, the existing app catalog remains available.
 
-No live data provider or scheduled workflow is connected yet. Provider integration will be added only after API access, field mappings, India coverage, usage limits and data terms are confirmed.
+The first live GitHub Actions run succeeded on 2026-10-24. API use is bounded to 250 delivered records per run; account-level allowances and any other Headcount API usage are shared.
 
 ## Current Status
 
-The project has a working prototype and the basic flow has been tested using the Machine Learning Engineer role. The data pipeline is under development on the `feature/daily-job-data-pipeline` branch; the `main` branch and trained model have not been changed by this work.
+The app remains a prototype. Its compatibility score is trained against a programmatically generated target, not independently labeled hiring outcomes. The pipeline now adds a fresh, limited-window market signal without retraining the model or replacing the catalog.
+

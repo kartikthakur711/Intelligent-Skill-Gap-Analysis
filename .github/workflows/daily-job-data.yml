@@ -3,13 +3,14 @@ name: Daily India skill demand
 on:
   push:
     branches:
-      - feature/daily-job-data-pipeline
+      - main
+      - 'feature/*'
   schedule:
     - cron: "17 2 * * *"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: daily-job-data
@@ -21,8 +22,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: feature/daily-job-data-pipeline
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
@@ -39,4 +38,17 @@ jobs:
           path: build/headcount_skill_demand.csv
           if-no-files-found: error
           retention-days: 14
+      - name: Publish aggregate for the app
+        if: github.ref == 'refs/heads/main'
+        run: |
+          cp build/headcount_skill_demand.csv data_pipeline/headcount_skill_demand.csv
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data_pipeline/headcount_skill_demand.csv
+          if git diff --cached --quiet; then
+            echo "No aggregate changes to publish."
+          else
+            git commit -m "Refresh daily India skill demand"
+            git push
+          fi
 

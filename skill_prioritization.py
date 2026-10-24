@@ -18,7 +18,7 @@ def normalize_skill(skill):
 
 
 def priority_from_demand(missing_skills, catalog):
-    """Rank gaps by observed catalog posting frequency, with explicit unknowns."""
+    """Rank gaps by observed catalog-row frequency, with explicit unknowns."""
     if not missing_skills:
         return pd.DataFrame(columns=["Skill", "Catalog Rows", "Catalog Frequency Score", "Priority", "Reason"])
 

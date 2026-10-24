@@ -12,7 +12,7 @@ The current Streamlit Community Cloud instructions support selecting a repositor
 
 - [ ] Choose a hosting environment and document its owner, region, availability target, and rollback procedure.
 - [ ] Use Python 3.11 and install the repository dependencies from requirements.txt.
-- [x] Confirm resume_job_ml_model.pkl, job_catalog.csv, and learning_resources.csv are present in the deployed branch. Keep the model artifact unchanged unless a separately reviewed model release is approved.
+- [x] Confirm resume_job_ml_model.pkl, job_catalog.csv, and learning_resources.csv are present in the reviewed branch. Keep the model artifact unchanged unless a separately reviewed model release is approved.
 - [ ] Confirm outbound access for first-use download of all-MiniLM-L6-v2; if job_catalog.csv is absent, the app attempts a Hugging Face dataset download. The catalog is present on the reviewed branch, so that fallback is not needed for this release.
 - [ ] Launch with streamlit run app.py and check a text PDF, DOCX, and TXT upload, unsupported-file handling, no-match titles, and a representative matched title.
 - [ ] Verify that resumes and extracted text are not retained or exposed through application logs, temporary storage, analytics, or backups beyond the approved policy.

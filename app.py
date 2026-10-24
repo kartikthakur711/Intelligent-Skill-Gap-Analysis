@@ -11,6 +11,8 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 from sklearn.metrics.pairwise import cosine_similarity
+from explainability import FEATURE_NAMES, explain_prediction
+from skill_prioritization import priority_from_demand
 
 
 APP_DIR = Path(__file__).resolve().parent
@@ -342,28 +344,6 @@ def choose_job(job_title, catalog, sentence_model=None):
     return None, [], 0.0, "none"
 
 
-def priority_from_demand(missing_skills, catalog):
-    counter = {}
-    for skills in catalog["skills_list"]:
-        for skill in skills:
-            key = normalize_skill(skill)
-            counter[key] = counter.get(key, 0) + 1
-
-    max_demand = max(counter.values(), default=1)
-    rows = []
-    for skill in missing_skills:
-        count = counter.get(normalize_skill(skill), 0)
-        score = count / max_demand
-        priority = "High" if score >= 0.50 else "Medium" if score >= 0.20 else "Low"
-        rows.append({
-            "Skill": skill,
-            "Job Demand": count,
-            "Demand Score": round(score, 3),
-            "Priority": priority,
-        })
-    return pd.DataFrame(rows).sort_values("Demand Score", ascending=False) if rows else pd.DataFrame()
-
-
 def roadmap_for_skills(missing_skills, dependencies):
     result = []
     seen = set()
@@ -460,7 +440,8 @@ if analyze:
             tfidf_sim,
             semantic_sim,
         ]])
-        compatibility = float(np.clip(model.predict(features)[0], 0, 100))
+        raw_compatibility, feature_contributions = explain_prediction(model, features[0])
+        compatibility = float(np.clip(raw_compatibility, 0, 100))
 
         priority_df = priority_from_demand(missing, catalog)
 
@@ -549,6 +530,24 @@ if analyze:
                 st.info("No resource link is currently mapped for the detected roadmap skills.")
         else:
             st.info("No learning-resource dataset is available yet.")
+
+        with st.expander("Why this compatibility score?"):
+            st.caption(
+                "Feature contributions use exact Shapley values over these five inputs, "
+                "with an all-zero reference. They sum to the model's raw prediction; "
+                "the displayed percentage is clipped to 0–100. These are model "
+                "attributions, not causal effects."
+            )
+            explanation = pd.DataFrame({
+                "Feature": FEATURE_NAMES,
+                "Input": features[0],
+                "Contribution (score points)": feature_contributions,
+            })
+            explanation["Contribution (score points)"] = explanation[
+                "Contribution (score points)"
+            ].round(3)
+            st.dataframe(explanation, use_container_width=True, hide_index=True)
+            st.caption(f"Raw model score before display clipping: {raw_compatibility:.3f}")
 
         with st.expander("Model Features"):
             st.write({

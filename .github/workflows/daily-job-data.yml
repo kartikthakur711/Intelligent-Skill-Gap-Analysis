@@ -1,6 +1,9 @@
 name: Daily India skill demand
 
 on:
+  push:
+    branches:
+      - feature/daily-job-data-pipeline
   schedule:
     - cron: "17 2 * * *"
   workflow_dispatch:
@@ -23,6 +26,8 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
+      - name: Run importer tests
+        run: python -B -m unittest discover -s data_pipeline -p 'test_*.py' -v
       - name: Build bounded aggregate
         env:
           HEADCOUNT_API_KEY: ${{ secrets.HEADCOUNT_API_KEY }}

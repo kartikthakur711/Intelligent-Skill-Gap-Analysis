@@ -88,7 +88,7 @@ The Streamlit application displays:
 
 ## Daily Data Pipeline
 
-A daily Headcount Labs workflow fetches current, non-stale India listings updated in the previous 48 hours, up to 250 distinct API records, including records without usable text. It uses descriptions in memory to count mentions of skills already present in the catalog taxonomy. It publishes category/skill counts and a JSON run summary with record, processing, and time-window metadata; source descriptions and personal details are never written to the repository.
+A daily Headcount Labs workflow fetches current, non-stale India listings published in the previous 48 hours, up to 250 distinct API records, including records without usable text. It uses descriptions in memory to count mentions of skills already present in the catalog taxonomy. It publishes category/skill counts and a JSON run summary with record, processing, and time-window metadata; source descriptions and personal details are never written to the repository.
 
 The Streamlit app shows those counts as a supplementary recent-listing signal beside its existing catalog demand. The trained model and job_catalog.csv remain unchanged. The workflow stores the aggregate in data_pipeline/headcount_skill_demand.csv and its metadata in data_pipeline/headcount_skill_demand.metadata.json, runs the importer tests, and uploads a 14-day artifact. If the API request or safety checks fail, the existing app catalog remains available.
 

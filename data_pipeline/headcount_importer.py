@@ -69,14 +69,19 @@ def request_page(params: dict[str, str], api_key: str, timeout: int = 30) -> dic
         f"{API_BASE}/v1/jobs?{query}",
         headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
     )
-    try:
-        with urlopen(request, timeout=timeout) as response:
-            payload = json.load(response)
-    except HTTPError as exc:
-        # Never include response text or request headers: either could contain secrets.
-        raise RuntimeError(f"Headcount API returned HTTP {exc.code}") from None
-    except (URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
-        raise RuntimeError(f"Headcount API request failed ({type(exc).__name__})") from None
+    for attempt in range(3):
+        try:
+            with urlopen(request, timeout=timeout) as response:
+                payload = json.load(response)
+            break
+        except HTTPError as exc:
+            # Never include response text or request headers: either could contain secrets.
+            if exc.code in {503, 504} and attempt < 2:
+                time.sleep(attempt + 1)
+                continue
+            raise RuntimeError(f"Headcount API returned HTTP {exc.code}") from None
+        except (URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+            raise RuntimeError(f"Headcount API request failed ({type(exc).__name__})") from None
     if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
         raise RuntimeError("Headcount API returned an unexpected response shape")
     return payload
@@ -97,7 +102,7 @@ def run(
     output_path: Path,
     *,
     api_key: str,
-    updated_since: str,
+    posted_since: str,
     max_records: int = 250,
     page_size: int = 100,
     sleep_seconds: float = 0.2,
@@ -114,7 +119,7 @@ def run(
         "country": "IN",
         "currentness": "current",
         "stale": "false",
-        "updated_since": updated_since,
+        "posted_since": posted_since,
         "sort": "updated",
         "fields": FIELDS,
         "limit": str(min(page_size, max_records)),
@@ -166,11 +171,11 @@ def run(
                 "category": category,
                 "skill": skill,
                 "distinct_job_count": count,
-                "window_start_utc": updated_since,
+                "window_start_utc": posted_since,
                 "generated_at_utc": generated_at,
             })
     temporary_path.replace(output_path)
-    metadata = {"generated_at_utc": generated_at, "window_start_utc": updated_since, "snapshot_watermark": watermark or "", "api_records": len(seen_job_ids), "processed_jobs": len(jobs), "category_skill_pairs": len(counts), "max_records": max_records}
+    metadata = {"generated_at_utc": generated_at, "window_start_utc": posted_since, "snapshot_watermark": watermark or "", "api_records": len(seen_job_ids), "processed_jobs": len(jobs), "category_skill_pairs": len(counts), "max_records": max_records}
     metadata_path = output_path.with_suffix(".metadata.json")
     metadata_temporary_path = metadata_path.with_suffix(metadata_path.suffix + ".tmp")
     with metadata_temporary_path.open("w", encoding="utf-8") as handle:
@@ -190,12 +195,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--catalog", type=Path, default=Path("job_catalog.csv"))
     parser.add_argument("--output", type=Path, default=Path("build/headcount_skill_demand.csv"))
-    parser.add_argument("--updated-since", help="RFC 3339 timestamp; defaults to 48 hours ago")
+    parser.add_argument("--posted-since", help="RFC 3339 timestamp; defaults to 48 hours ago")
     parser.add_argument("--max-records", type=int, default=250)
     args = parser.parse_args()
-    since = args.updated_since or (datetime.now(timezone.utc) - timedelta(hours=48)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    since = args.posted_since or (datetime.now(timezone.utc) - timedelta(hours=48)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     try:
-        report = run(args.catalog, args.output, api_key=os.environ.get("HEADCOUNT_API_KEY", ""), updated_since=since, max_records=args.max_records)
+        report = run(args.catalog, args.output, api_key=os.environ.get("HEADCOUNT_API_KEY", ""), posted_since=since, max_records=args.max_records)
     except (OSError, ValueError, RuntimeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2

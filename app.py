@@ -14,7 +14,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 from data_pipeline.skill_demand import load_headcount_demand as read_headcount_demand
 from data_pipeline.skill_demand import recent_skill_counts
-from app_helpers import clean_html
+from app_helpers import build_learning_roadmap, clean_html
 
 
 APP_DIR = Path(__file__).resolve().parent
@@ -363,24 +363,6 @@ def priority_from_demand(missing_skills, catalog, recent_counts=None):
     return pd.DataFrame(rows).sort_values("Demand Score", ascending=False) if rows else pd.DataFrame()
 
 
-def roadmap_for_skills(missing_skills, dependencies):
-    result = []
-    seen = set()
-
-    def add(skill):
-        key = normalize_skill(skill)
-        if key in seen:
-            return
-        for dep in dependencies.get(key, []):
-            add(dep)
-        seen.add(key)
-        result.append(skill)
-
-    for skill in missing_skills:
-        add(skill)
-    return result
-
-
 # -----------------------------
 # UI
 # -----------------------------
@@ -501,7 +483,7 @@ if analyze:
             "react": ["javascript", "html", "css"],
             "spring": ["java", "software development"],
         }
-        roadmap = roadmap_for_skills(missing, dependencies)
+        roadmap = build_learning_roadmap(missing, dependencies, resume_skills, normalize_skill)
         resources = load_resources()
 
         st.success(f"Analysis completed for **{selected_job['job_title']}**")
@@ -533,9 +515,11 @@ if analyze:
                 )
             elif recent_counts is None:
                 st.caption("Daily India listing data is not available yet; priorities use the existing catalog.")
+            st.caption("Job Demand counts skill occurrences in the loaded job catalog; Demand Score is that count divided by the most frequent catalog skill. These are catalog-frequency measures, not unique vacancies or hiring probabilities. Repeated/template rows can affect the counts.")
             st.dataframe(priority_df, use_container_width=True, hide_index=True)
 
         st.subheader("Personalized Learning Roadmap")
+        st.caption("The roadmap starts with detected skill gaps and skips prerequisites already detected in your resume.")
         if roadmap:
             for i, skill in enumerate(roadmap, 1):
                 st.write(f"**{i}. {skill.title()}**")

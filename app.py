@@ -1,5 +1,6 @@
 import ast
 import difflib
+import hashlib
 import io
 import os
 import html
@@ -20,6 +21,7 @@ from app_helpers import (
     build_skill_recommendations,
     clean_html,
 )
+from learning_progress import ProgressStoreError, load_progress, save_progress
 
 
 APP_DIR = Path(__file__).resolve().parent
@@ -28,6 +30,9 @@ JOB_FILE = APP_DIR / "job_catalog.csv"
 RESOURCE_FILE = APP_DIR / "learning_resources.csv"
 HEADCOUNT_DEMAND_FILE = APP_DIR / "data_pipeline" / "headcount_skill_demand.csv"
 HEADCOUNT_METADATA_FILE = APP_DIR / "data_pipeline" / "headcount_skill_demand.metadata.json"
+LEARNING_PROGRESS_FILE = Path(
+    os.environ.get("LEARNING_PROGRESS_FILE", APP_DIR / "data" / "learning_progress.json")
+)
 
 
 def clean_job_description(text):
@@ -379,7 +384,18 @@ job_title = st.text_input("Target Job Title", placeholder="e.g., Data Scientist"
 
 analyze = st.button("Analyze Resume", type="primary", use_container_width=True)
 
-if analyze:
+input_fingerprint = ""
+if uploaded is not None and job_title.strip():
+    input_fingerprint = hashlib.sha256(
+        uploaded.getvalue() + b"\0" + job_title.strip().casefold().encode("utf-8")
+    ).hexdigest()
+if analyze and input_fingerprint:
+    st.session_state["analysis_input_fingerprint"] = input_fingerprint
+should_analyze = bool(input_fingerprint) and (
+    st.session_state.get("analysis_input_fingerprint") == input_fingerprint
+) or analyze
+
+if should_analyze:
     if uploaded is None:
         st.error("Please upload a resume.")
         st.stop()
@@ -545,6 +561,64 @@ if analyze:
                     st.caption("Consolidate earlier skills and practice with a small project.")
         else:
             st.write("No additional learning steps are required from the detected job skills.")
+
+        if roadmap:
+            st.subheader("Learning Progress")
+            st.caption(
+                "Progress is saved in a local JSON file. Use a nickname, not sensitive information; "
+                "the profile label is hashed before storage and is not an access control."
+            )
+            progress_profile = st.text_input(
+                "Progress profile", value="default", key="learning_progress_profile"
+            )
+            completed_before_save = []
+            try:
+                completed_before_save = load_progress(
+                    LEARNING_PROGRESS_FILE, progress_profile, selected_job["job_title"],
+                    roadmap, normalize_skill,
+                )
+            except ProgressStoreError as exc:
+                st.error(str(exc))
+
+            plan_widget_id = hashlib.sha256(
+                (selected_job["job_title"] + "\0" + "\0".join(
+                    normalize_skill(skill) for skill in roadmap
+                )).encode("utf-8")
+            ).hexdigest()[:12]
+            profile_widget_id = hashlib.sha256(
+                " ".join(progress_profile.split()).casefold().encode("utf-8")
+            ).hexdigest()[:12]
+            progress_widget_keys = []
+            with st.form("learning_progress_form"):
+                st.write("Mark the learning steps you have completed.")
+                for skill in roadmap:
+                    widget_key = (
+                        f"learning_done_{profile_widget_id}_{plan_widget_id}_"
+                        f"{hashlib.sha256(normalize_skill(skill).encode('utf-8')).hexdigest()[:8]}"
+                    )
+                    progress_widget_keys.append((skill, widget_key))
+                    st.checkbox(
+                        skill.title(), value=skill in completed_before_save, key=widget_key
+                    )
+                progress_submitted = st.form_submit_button("Save progress")
+
+            selected_completed = [
+                skill for skill, widget_key in progress_widget_keys
+                if st.session_state.get(widget_key, skill in completed_before_save)
+            ]
+            if progress_submitted:
+                try:
+                    save_progress(
+                        LEARNING_PROGRESS_FILE, progress_profile, selected_job["job_title"],
+                        roadmap, selected_completed, normalize_skill,
+                    )
+                    st.success("Learning progress saved.")
+                except ProgressStoreError as exc:
+                    st.error(str(exc))
+            progress_count = len(selected_completed)
+            progress_ratio = progress_count / len(roadmap)
+            st.progress(progress_ratio, text=f"{progress_count} of {len(roadmap)} steps completed")
+            st.caption("Progress is stored at the configured local file path.")
 
         st.subheader("Ranked Recommendations and Resources")
         if recommendations:

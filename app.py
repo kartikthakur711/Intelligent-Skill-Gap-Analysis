@@ -22,6 +22,7 @@ from app_helpers import (
     clean_html,
 )
 from learning_progress import ProgressStoreError, load_progress, save_progress
+from dashboard_ui import apply_app_styles, render_dashboard, render_sidebar
 
 
 APP_DIR = Path(__file__).resolve().parent
@@ -49,6 +50,8 @@ st.set_page_config(
     page_icon="🎯",
     layout="wide",
 )
+apply_app_styles()
+
 
 
 # -----------------------------
@@ -376,289 +379,293 @@ def priority_from_demand(missing_skills, catalog, recent_counts=None):
 # -----------------------------
 # UI
 # -----------------------------
-st.title("🎯 Intelligent Skill Gap Analysis & Personalized Learning")
-st.write("Upload your resume and enter the target job title. The system retrieves the job, predicts compatibility, identifies skill gaps, and builds a learning roadmap.")
+page = render_sidebar()
+if page == "Dashboard":
+    render_dashboard()
+else:
+    st.title("🎯 Intelligent Skill Gap Analysis & Personalized Learning")
+    st.write("Upload your resume and enter the target job title. The system retrieves the job, predicts compatibility, identifies skill gaps, and builds a learning roadmap.")
 
-uploaded = st.file_uploader("Upload Resume", type=["pdf", "docx", "txt"])
-job_title = st.text_input("Target Job Title", placeholder="e.g., Data Scientist")
+    uploaded = st.file_uploader("Upload Resume", type=["pdf", "docx", "txt"])
+    job_title = st.text_input("Target Job Title", placeholder="e.g., Data Scientist")
 
-analyze = st.button("Analyze Resume", type="primary", use_container_width=True)
+    analyze = st.button("Analyze Resume", type="primary", use_container_width=True)
 
-input_fingerprint = ""
-if uploaded is not None and job_title.strip():
-    input_fingerprint = hashlib.sha256(
-        uploaded.getvalue() + b"\0" + job_title.strip().casefold().encode("utf-8")
-    ).hexdigest()
-if analyze and input_fingerprint:
-    st.session_state["analysis_input_fingerprint"] = input_fingerprint
-should_analyze = bool(input_fingerprint) and (
-    st.session_state.get("analysis_input_fingerprint") == input_fingerprint
-) or analyze
+    input_fingerprint = ""
+    if uploaded is not None and job_title.strip():
+        input_fingerprint = hashlib.sha256(
+            uploaded.getvalue() + b"\0" + job_title.strip().casefold().encode("utf-8")
+        ).hexdigest()
+    if analyze and input_fingerprint:
+        st.session_state["analysis_input_fingerprint"] = input_fingerprint
+    should_analyze = bool(input_fingerprint) and (
+        st.session_state.get("analysis_input_fingerprint") == input_fingerprint
+    ) or analyze
 
-if should_analyze:
-    if uploaded is None:
-        st.error("Please upload a resume.")
-        st.stop()
-    if not job_title.strip():
-        st.error("Please enter a target job title.")
-        st.stop()
-
-    try:
-        resume_text = extract_text_from_upload(uploaded)
-        if len(resume_text.strip()) < 50:
-            st.error("Very little text was extracted from the resume. Try a text-based PDF/DOCX.")
+    if should_analyze:
+        if uploaded is None:
+            st.error("Please upload a resume.")
+            st.stop()
+        if not job_title.strip():
+            st.error("Please enter a target job title.")
             st.stop()
 
-        catalog = load_job_catalog()
-        sentence_model = load_sentence_model()
-        selected_job, suggestions, title_score, match_method = choose_job(
-            job_title, catalog, sentence_model
-        )
-        if selected_job is None:
-            st.error("No sufficiently relevant job title was found in the job-description dataset.")
-            st.info("Try a more specific title such as Machine Learning Engineer, Data Scientist, or Software Engineer.")
-            st.stop()
+        try:
+            resume_text = extract_text_from_upload(uploaded)
+            if len(resume_text.strip()) < 50:
+                st.error("Very little text was extracted from the resume. Try a text-based PDF/DOCX.")
+                st.stop()
 
-        if match_method == "exact":
-            st.success(f"Exact dataset match: **{selected_job['job_title']}**")
-        else:
-            st.info(
-                f"Closest relevant dataset match: **{selected_job['job_title']}** "
-                f"(title relevance: {title_score * 100:.1f}%)"
+            catalog = load_job_catalog()
+            sentence_model = load_sentence_model()
+            selected_job, suggestions, title_score, match_method = choose_job(
+                job_title, catalog, sentence_model
             )
+            if selected_job is None:
+                st.error("No sufficiently relevant job title was found in the job-description dataset.")
+                st.info("Try a more specific title such as Machine Learning Engineer, Data Scientist, or Software Engineer.")
+                st.stop()
 
-        job_skills = parse_list(selected_job["job_skill_set"])
-        skill_vocab = set()
-        for skills in catalog["skills_list"]:
-            skill_vocab.update(skills)
+            if match_method == "exact":
+                st.success(f"Exact dataset match: **{selected_job['job_title']}**")
+            else:
+                st.info(
+                    f"Closest relevant dataset match: **{selected_job['job_title']}** "
+                    f"(title relevance: {title_score * 100:.1f}%)"
+                )
 
-        resume_skills = extract_resume_skills(resume_text, skill_vocab)
-        matched = calculate_matches(resume_skills, job_skills)
-        missing = calculate_gap(resume_skills, job_skills)
-        overlap_ratio = len(matched) / len(job_skills) if job_skills else 0.0
+            job_skills = parse_list(selected_job["job_skill_set"])
+            skill_vocab = set()
+            for skills in catalog["skills_list"]:
+                skill_vocab.update(skills)
 
-        ml_artifacts = load_model()
-        if ml_artifacts is None:
-            st.error("ML model file not found. Run the ML training cells in the project notebook first.")
-            st.stop()
+            resume_skills = extract_resume_skills(resume_text, skill_vocab)
+            matched = calculate_matches(resume_skills, job_skills)
+            missing = calculate_gap(resume_skills, job_skills)
+            overlap_ratio = len(matched) / len(job_skills) if job_skills else 0.0
 
-        vectorizer = ml_artifacts["vectorizer"]
-        model = ml_artifacts["model"]
+            ml_artifacts = load_model()
+            if ml_artifacts is None:
+                st.error("ML model file not found. Run the ML training cells in the project notebook first.")
+                st.stop()
 
-        resume_tfidf = vectorizer.transform([resume_text])
-        job_description_clean = clean_job_description(selected_job["job_description"])
-        job_tfidf = vectorizer.transform([job_description_clean])
-        tfidf_sim = float(cosine_similarity(resume_tfidf, job_tfidf)[0, 0])
+            vectorizer = ml_artifacts["vectorizer"]
+            model = ml_artifacts["model"]
 
-        resume_emb = sentence_model.encode([resume_text], normalize_embeddings=True)
-        job_emb = sentence_model.encode([job_description_clean], normalize_embeddings=True)
-        semantic_sim = float(np.dot(resume_emb[0], job_emb[0]))
-        semantic_sim = float(np.clip((semantic_sim + 1) / 2, 0, 1))
+            resume_tfidf = vectorizer.transform([resume_text])
+            job_description_clean = clean_job_description(selected_job["job_description"])
+            job_tfidf = vectorizer.transform([job_description_clean])
+            tfidf_sim = float(cosine_similarity(resume_tfidf, job_tfidf)[0, 0])
 
-        features = np.array([[
-            len(resume_skills),
-            len(job_skills),
-            overlap_ratio,
-            tfidf_sim,
-            semantic_sim,
-        ]])
-        compatibility = float(np.clip(model.predict(features)[0], 0, 100))
+            resume_emb = sentence_model.encode([resume_text], normalize_embeddings=True)
+            job_emb = sentence_model.encode([job_description_clean], normalize_embeddings=True)
+            semantic_sim = float(np.dot(resume_emb[0], job_emb[0]))
+            semantic_sim = float(np.clip((semantic_sim + 1) / 2, 0, 1))
 
-        headcount_rows, headcount_metadata = load_headcount_demand()
-        recent_counts = recent_skill_counts(headcount_rows)
-        priority_df = priority_from_demand(missing, catalog, recent_counts)
+            features = np.array([[
+                len(resume_skills),
+                len(job_skills),
+                overlap_ratio,
+                tfidf_sim,
+                semantic_sim,
+            ]])
+            compatibility = float(np.clip(model.predict(features)[0], 0, 100))
 
-        dependencies = {
-            "numpy": ["python"],
-            "pandas": ["python", "numpy"],
-            "matplotlib": ["python"],
-            "seaborn": ["python", "pandas", "matplotlib"],
-            "statistics": ["python"],
-            "machine learning": ["python", "numpy", "pandas", "statistics"],
-            "scikit learn": ["python", "numpy", "pandas", "machine learning"],
-            "deep learning": ["python", "numpy", "machine learning"],
-            "tensorflow": ["python", "numpy", "deep learning"],
-            "pytorch": ["python", "numpy", "deep learning"],
-            "keras": ["python", "deep learning", "tensorflow"],
-            "natural language processing": ["python", "machine learning"],
-            "computer vision": ["python", "numpy", "deep learning"],
-            "sql": ["database"],
-            "mysql": ["sql", "database"],
-            "mongodb": ["database"],
-            "data analysis": ["python", "pandas", "statistics"],
-            "data science": ["python", "statistics", "data analysis", "machine learning"],
-            "power bi": ["data analysis"],
-            "tableau": ["data analysis"],
-            "docker": ["linux", "software development"],
-            "aws": ["cloud computing"],
-            "git": ["software development"],
-            "github": ["git"],
-            "rest apis": ["python", "software development"],
-            "flask": ["python", "rest apis"],
-            "django": ["python", "software development"],
-            "java": ["programming"],
-            "c++": ["programming"],
-            "javascript": ["programming"],
-            "html": ["web development"],
-            "css": ["html", "web development"],
-            "react": ["javascript", "html", "css"],
-            "spring": ["java", "software development"],
-        }
-        resources = load_resources()
-        resource_records = resources.fillna("").to_dict(orient="records")
-        recommendations = build_skill_recommendations(
-            priority_df.fillna(0).to_dict(orient="records"),
-            resource_records,
-            normalize_skill,
-        )
-        ranked_missing = [item["Skill"] for item in recommendations] or missing
-        roadmap = build_learning_roadmap(
-            ranked_missing, dependencies, resume_skills, normalize_skill
-        )
-        learning_plan = build_learning_plan(roadmap, normalize_skill)
+            headcount_rows, headcount_metadata = load_headcount_demand()
+            recent_counts = recent_skill_counts(headcount_rows)
+            priority_df = priority_from_demand(missing, catalog, recent_counts)
 
-        st.success(f"Analysis completed for **{selected_job['job_title']}**")
+            dependencies = {
+                "numpy": ["python"],
+                "pandas": ["python", "numpy"],
+                "matplotlib": ["python"],
+                "seaborn": ["python", "pandas", "matplotlib"],
+                "statistics": ["python"],
+                "machine learning": ["python", "numpy", "pandas", "statistics"],
+                "scikit learn": ["python", "numpy", "pandas", "machine learning"],
+                "deep learning": ["python", "numpy", "machine learning"],
+                "tensorflow": ["python", "numpy", "deep learning"],
+                "pytorch": ["python", "numpy", "deep learning"],
+                "keras": ["python", "deep learning", "tensorflow"],
+                "natural language processing": ["python", "machine learning"],
+                "computer vision": ["python", "numpy", "deep learning"],
+                "sql": ["database"],
+                "mysql": ["sql", "database"],
+                "mongodb": ["database"],
+                "data analysis": ["python", "pandas", "statistics"],
+                "data science": ["python", "statistics", "data analysis", "machine learning"],
+                "power bi": ["data analysis"],
+                "tableau": ["data analysis"],
+                "docker": ["linux", "software development"],
+                "aws": ["cloud computing"],
+                "git": ["software development"],
+                "github": ["git"],
+                "rest apis": ["python", "software development"],
+                "flask": ["python", "rest apis"],
+                "django": ["python", "software development"],
+                "java": ["programming"],
+                "c++": ["programming"],
+                "javascript": ["programming"],
+                "html": ["web development"],
+                "css": ["html", "web development"],
+                "react": ["javascript", "html", "css"],
+                "spring": ["java", "software development"],
+            }
+            resources = load_resources()
+            resource_records = resources.fillna("").to_dict(orient="records")
+            recommendations = build_skill_recommendations(
+                priority_df.fillna(0).to_dict(orient="records"),
+                resource_records,
+                normalize_skill,
+            )
+            ranked_missing = [item["Skill"] for item in recommendations] or missing
+            roadmap = build_learning_roadmap(
+                ranked_missing, dependencies, resume_skills, normalize_skill
+            )
+            learning_plan = build_learning_plan(roadmap, normalize_skill)
 
-        c1, c2, c3 = st.columns(3)
-        c1.metric("ML Compatibility", f"{compatibility:.1f}%")
-        st.caption("Prototype estimate trained on constructed compatibility scores; it is not a hiring probability or prediction of interview success.")
-        c2.metric("Matched Skills", f"{len(matched)} / {len(job_skills)}")
-        c3.metric("Missing Skills", len(missing))
+            st.success(f"Analysis completed for **{selected_job['job_title']}**")
 
-        st.subheader("Job Selected")
-        st.write(selected_job["job_title"])
-        st.caption(clean_job_description(selected_job["job_description"]))
+            c1, c2, c3 = st.columns(3)
+            c1.metric("ML Compatibility", f"{compatibility:.1f}%")
+            st.caption("Prototype estimate trained on constructed compatibility scores; it is not a hiring probability or prediction of interview success.")
+            c2.metric("Matched Skills", f"{len(matched)} / {len(job_skills)}")
+            c3.metric("Missing Skills", len(missing))
 
-        st.subheader("Matched Skills")
-        st.write(", ".join(matched) if matched else "No direct skill matches detected.")
+            st.subheader("Job Selected")
+            st.write(selected_job["job_title"])
+            st.caption(clean_job_description(selected_job["job_description"]))
 
-        st.subheader("Missing Skills")
-        st.write(", ".join(missing) if missing else "No missing skills detected.")
+            st.subheader("Matched Skills")
+            st.write(", ".join(matched) if matched else "No direct skill matches detected.")
 
-        if not priority_df.empty:
-            st.subheader("Prioritized Skill Gap")
-            if headcount_metadata:
+            st.subheader("Missing Skills")
+            st.write(", ".join(missing) if missing else "No missing skills detected.")
+
+            if not priority_df.empty:
+                st.subheader("Prioritized Skill Gap")
+                if headcount_metadata:
+                    st.caption(
+                        f"India listing window from {headcount_metadata['window_start_utc']} UTC; "
+                        f"{headcount_metadata['api_records']} API records, {headcount_metadata['processed_jobs']} usable descriptions. "
+                        f"Generated {headcount_metadata['generated_at_utc']} UTC. Catalog demand still determines priority."
+                        + (" No listings matched this window." if int(headcount_metadata.get("api_records", "0")) == 0 else (f" No known catalog skills matched among {headcount_metadata['processed_jobs']} usable listings." if not headcount_rows else ""))
+                    )
+                elif recent_counts is None:
+                    st.caption("Daily India listing data is not available yet; priorities use the existing catalog.")
+                st.caption("Job Demand counts skill occurrences in the loaded job catalog; Demand Score is that count divided by the most frequent catalog skill. These are catalog-frequency measures, not unique vacancies or hiring probabilities. Repeated/template rows can affect the counts.")
+                st.dataframe(priority_df, use_container_width=True, hide_index=True)
+
+            st.subheader("Personalized Learning Plan")
+            st.caption("Prerequisites come first. Missing skills are ranked using catalog frequency, with recent India listing counts as a modest supplementary signal. The 30/60/90-day groups are suggested pacing, not fixed course durations.")
+            if roadmap:
+                for phase in learning_plan:
+                    st.markdown(f"**{phase['Phase']}**")
+                    if phase["Skills"]:
+                        for skill in phase["Skills"]:
+                            st.write(f"- {skill.title()}")
+                    else:
+                        st.caption("Consolidate earlier skills and practice with a small project.")
+            else:
+                st.write("No additional learning steps are required from the detected job skills.")
+
+            if roadmap:
+                st.subheader("Learning Progress")
                 st.caption(
-                    f"India listing window from {headcount_metadata['window_start_utc']} UTC; "
-                    f"{headcount_metadata['api_records']} API records, {headcount_metadata['processed_jobs']} usable descriptions. "
-                    f"Generated {headcount_metadata['generated_at_utc']} UTC. Catalog demand still determines priority."
-                    + (" No listings matched this window." if int(headcount_metadata.get("api_records", "0")) == 0 else (f" No known catalog skills matched among {headcount_metadata['processed_jobs']} usable listings." if not headcount_rows else ""))
+                    "Progress is saved in a local JSON file. Use a nickname, not sensitive information; "
+                    "the profile label is hashed before storage and is not an access control."
                 )
-            elif recent_counts is None:
-                st.caption("Daily India listing data is not available yet; priorities use the existing catalog.")
-            st.caption("Job Demand counts skill occurrences in the loaded job catalog; Demand Score is that count divided by the most frequent catalog skill. These are catalog-frequency measures, not unique vacancies or hiring probabilities. Repeated/template rows can affect the counts.")
-            st.dataframe(priority_df, use_container_width=True, hide_index=True)
-
-        st.subheader("Personalized Learning Plan")
-        st.caption("Prerequisites come first. Missing skills are ranked using catalog frequency, with recent India listing counts as a modest supplementary signal. The 30/60/90-day groups are suggested pacing, not fixed course durations.")
-        if roadmap:
-            for phase in learning_plan:
-                st.markdown(f"**{phase['Phase']}**")
-                if phase["Skills"]:
-                    for skill in phase["Skills"]:
-                        st.write(f"- {skill.title()}")
-                else:
-                    st.caption("Consolidate earlier skills and practice with a small project.")
-        else:
-            st.write("No additional learning steps are required from the detected job skills.")
-
-        if roadmap:
-            st.subheader("Learning Progress")
-            st.caption(
-                "Progress is saved in a local JSON file. Use a nickname, not sensitive information; "
-                "the profile label is hashed before storage and is not an access control."
-            )
-            progress_profile = st.text_input(
-                "Progress profile", value="default", key="learning_progress_profile"
-            )
-            completed_before_save = []
-            try:
-                completed_before_save = load_progress(
-                    LEARNING_PROGRESS_FILE, progress_profile, selected_job["job_title"],
-                    roadmap, normalize_skill,
+                progress_profile = st.text_input(
+                    "Progress profile", value="default", key="learning_progress_profile"
                 )
-            except ProgressStoreError as exc:
-                st.error(str(exc))
-
-            plan_widget_id = hashlib.sha256(
-                (selected_job["job_title"] + "\0" + "\0".join(
-                    normalize_skill(skill) for skill in roadmap
-                )).encode("utf-8")
-            ).hexdigest()[:12]
-            profile_widget_id = hashlib.sha256(
-                " ".join(progress_profile.split()).casefold().encode("utf-8")
-            ).hexdigest()[:12]
-            progress_widget_keys = []
-            with st.form("learning_progress_form"):
-                st.write("Mark the learning steps you have completed.")
-                for skill in roadmap:
-                    widget_key = (
-                        f"learning_done_{profile_widget_id}_{plan_widget_id}_"
-                        f"{hashlib.sha256(normalize_skill(skill).encode('utf-8')).hexdigest()[:8]}"
-                    )
-                    progress_widget_keys.append((skill, widget_key))
-                    st.checkbox(
-                        skill.title(), value=skill in completed_before_save, key=widget_key
-                    )
-                progress_submitted = st.form_submit_button("Save progress")
-
-            selected_completed = [
-                skill for skill, widget_key in progress_widget_keys
-                if st.session_state.get(widget_key, skill in completed_before_save)
-            ]
-            if progress_submitted:
+                completed_before_save = []
                 try:
-                    save_progress(
+                    completed_before_save = load_progress(
                         LEARNING_PROGRESS_FILE, progress_profile, selected_job["job_title"],
-                        roadmap, selected_completed, normalize_skill,
+                        roadmap, normalize_skill,
                     )
-                    st.success("Learning progress saved.")
                 except ProgressStoreError as exc:
                     st.error(str(exc))
-            progress_count = len(selected_completed)
-            progress_ratio = progress_count / len(roadmap)
-            st.progress(progress_ratio, text=f"{progress_count} of {len(roadmap)} steps completed")
-            st.caption("Progress is stored at the configured local file path.")
 
-        st.subheader("Ranked Recommendations and Resources")
-        if recommendations:
-            for recommendation in recommendations:
-                st.markdown(f"**{recommendation['Rank']}. {recommendation['Skill'].title()}** — {recommendation['Explanation']}")
-                if recommendation["Resources"]:
-                    for resource in recommendation["Resources"]:
-                        st.markdown(f"[{resource['resource']}]({resource['url']}) · {resource['type']}")
+                plan_widget_id = hashlib.sha256(
+                    (selected_job["job_title"] + "\0" + "\0".join(
+                        normalize_skill(skill) for skill in roadmap
+                    )).encode("utf-8")
+                ).hexdigest()[:12]
+                profile_widget_id = hashlib.sha256(
+                    " ".join(progress_profile.split()).casefold().encode("utf-8")
+                ).hexdigest()[:12]
+                progress_widget_keys = []
+                with st.form("learning_progress_form"):
+                    st.write("Mark the learning steps you have completed.")
+                    for skill in roadmap:
+                        widget_key = (
+                            f"learning_done_{profile_widget_id}_{plan_widget_id}_"
+                            f"{hashlib.sha256(normalize_skill(skill).encode('utf-8')).hexdigest()[:8]}"
+                        )
+                        progress_widget_keys.append((skill, widget_key))
+                        st.checkbox(
+                            skill.title(), value=skill in completed_before_save, key=widget_key
+                        )
+                    progress_submitted = st.form_submit_button("Save progress")
+
+                selected_completed = [
+                    skill for skill, widget_key in progress_widget_keys
+                    if st.session_state.get(widget_key, skill in completed_before_save)
+                ]
+                if progress_submitted:
+                    try:
+                        save_progress(
+                            LEARNING_PROGRESS_FILE, progress_profile, selected_job["job_title"],
+                            roadmap, selected_completed, normalize_skill,
+                        )
+                        st.success("Learning progress saved.")
+                    except ProgressStoreError as exc:
+                        st.error(str(exc))
+                progress_count = len(selected_completed)
+                progress_ratio = progress_count / len(roadmap)
+                st.progress(progress_ratio, text=f"{progress_count} of {len(roadmap)} steps completed")
+                st.caption("Progress is stored at the configured local file path.")
+
+            st.subheader("Ranked Recommendations and Resources")
+            if recommendations:
+                for recommendation in recommendations:
+                    st.markdown(f"**{recommendation['Rank']}. {recommendation['Skill'].title()}** — {recommendation['Explanation']}")
+                    if recommendation["Resources"]:
+                        for resource in recommendation["Resources"]:
+                            st.markdown(f"[{resource['resource']}]({resource['url']}) · {resource['type']}")
+                    else:
+                        st.caption("No resource is mapped for this skill in the existing catalog.")
+            elif roadmap:
+                st.info("No missing job skills need a recommendation.")
+            if not resources.empty and roadmap:
+                # Show catalog entries for prerequisite steps too, where available.
+                normalized_resources = resources.copy()
+                normalized_resources["skill_normalized"] = normalized_resources["skill"].map(normalize_skill)
+                selected_resources = normalized_resources[
+                    normalized_resources["skill_normalized"].isin({normalize_skill(x) for x in roadmap})
+                ][["skill", "resource", "type", "url"]].drop_duplicates()
+                if selected_resources.empty:
+                    st.info("No resource link is currently mapped for the detected roadmap skills.")
                 else:
-                    st.caption("No resource is mapped for this skill in the existing catalog.")
-        elif roadmap:
-            st.info("No missing job skills need a recommendation.")
-        if not resources.empty and roadmap:
-            # Show catalog entries for prerequisite steps too, where available.
-            normalized_resources = resources.copy()
-            normalized_resources["skill_normalized"] = normalized_resources["skill"].map(normalize_skill)
-            selected_resources = normalized_resources[
-                normalized_resources["skill_normalized"].isin({normalize_skill(x) for x in roadmap})
-            ][["skill", "resource", "type", "url"]].drop_duplicates()
-            if selected_resources.empty:
-                st.info("No resource link is currently mapped for the detected roadmap skills.")
+                    with st.expander("All catalog resources for roadmap skills"):
+                        st.dataframe(
+                            selected_resources,
+                            use_container_width=True,
+                            hide_index=True,
+                            column_config={"url": st.column_config.LinkColumn("Resource Link")},
+                        )
             else:
-                with st.expander("All catalog resources for roadmap skills"):
-                    st.dataframe(
-                        selected_resources,
-                        use_container_width=True,
-                        hide_index=True,
-                        column_config={"url": st.column_config.LinkColumn("Resource Link")},
-                    )
-        else:
-            st.info("No learning-resource dataset is available yet.")
+                st.info("No learning-resource dataset is available yet.")
 
-        with st.expander("Model Features"):
-            st.write({
-                "resume_skill_count": len(resume_skills),
-                "job_skill_count": len(job_skills),
-                "skill_overlap_ratio": round(overlap_ratio, 4),
-                "tfidf_similarity": round(tfidf_sim, 4),
-                "semantic_similarity": round(semantic_sim, 4),
-            })
+            with st.expander("Model Features"):
+                st.write({
+                    "resume_skill_count": len(resume_skills),
+                    "job_skill_count": len(job_skills),
+                    "skill_overlap_ratio": round(overlap_ratio, 4),
+                    "tfidf_similarity": round(tfidf_sim, 4),
+                    "semantic_similarity": round(semantic_sim, 4),
+                })
 
-    except Exception as exc:
-        st.exception(exc)
+        except Exception as exc:
+            st.exception(exc)

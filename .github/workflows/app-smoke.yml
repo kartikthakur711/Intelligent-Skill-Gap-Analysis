@@ -8,6 +8,7 @@ on:
     paths:
       - 'app.py'
       - 'app_helpers.py'
+      - 'dashboard_ui.py'
       - 'requirements.txt'
       - 'resume_job_ml_model.pkl'
       - 'job_catalog.csv'
@@ -18,6 +19,7 @@ on:
     paths:
       - 'app.py'
       - 'app_helpers.py'
+      - 'dashboard_ui.py'
       - 'requirements.txt'
       - 'resume_job_ml_model.pkl'
       - 'job_catalog.csv'
@@ -64,6 +66,13 @@ jobs:
 
           app = AppTest.from_file("app.py").run(timeout=60)
           assert not app.exception, [exception.message for exception in app.exception]
-          assert any("Intelligent Skill Gap Analysis" in title.value for title in app.title)
-          print("Initial app render passed")
+          assert app.radio[0].value == "Dashboard"
+          assert any("Turn your skills into your next opportunity." in item.value for item in app.markdown)
+          assert any("Start with your resume" in button.label for button in app.button)
+          app.button[0].click().run(timeout=60)
+          assert not app.exception, [exception.message for exception in app.exception]
+          assert app.radio[0].value == "Analyze resume"
+          assert len(app.file_uploader) == 1
+          assert any(button.label == "Analyze Resume" for button in app.button)
+          print("Dashboard render and navigation passed")
           PY

@@ -1,6 +1,13 @@
 import unittest
+import csv
+from pathlib import Path
+from urllib.parse import urlparse
 
-from app_helpers import build_learning_roadmap
+from app_helpers import (
+    build_learning_plan,
+    build_learning_roadmap,
+    build_skill_recommendations,
+)
 
 
 def normalize_skill(value):
@@ -22,10 +29,7 @@ class LearningRoadmapTests(unittest.TestCase):
         self.assertNotIn("pandas", roadmap)
 
     def test_deduplicates_prerequisites(self):
-        dependencies = {
-            "skill a": ["python"],
-            "skill b": ["python"],
-        }
+        dependencies = {"skill a": ["python"], "skill b": ["python"]}
         roadmap = build_learning_roadmap(
             ["skill a", "skill b"], dependencies, [], normalize_skill
         )
@@ -35,6 +39,59 @@ class LearningRoadmapTests(unittest.TestCase):
         self.assertEqual(
             build_learning_roadmap([], {}, ["python"], normalize_skill), []
         )
+
+
+class RecommendationTests(unittest.TestCase):
+    def test_resource_catalog_has_skill_names_and_absolute_web_links(self):
+        path = Path(__file__).resolve().parents[1] / "learning_resources.csv"
+        with path.open(encoding="utf-8", newline="") as handle:
+            resources = list(csv.DictReader(handle))
+        self.assertTrue(resources)
+        self.assertTrue(all(row["skill"].strip() for row in resources))
+        self.assertTrue(all(urlparse(row["url"]).scheme in {"http", "https"} for row in resources))
+
+    def test_ranks_using_catalog_and_recent_demand_and_attaches_catalog_resources(self):
+        rows = [
+            {"Skill": "Python", "Job Demand": 100, "Demand Score": 0.5, "Recent India Listings (48h)": 0},
+            {"Skill": "SQL", "Job Demand": 50, "Demand Score": 0.25, "Recent India Listings (48h)": 5},
+            {"Skill": "Rare", "Job Demand": 0, "Demand Score": 0, "Recent India Listings (48h)": 0},
+        ]
+        resources = [
+            {"skill": "python", "resource": "Python Docs", "type": "Documentation", "url": "https://docs.python.org/3/"},
+        ]
+        result = build_skill_recommendations(rows, resources, normalize_skill)
+        self.assertEqual([item["Skill"] for item in result], ["Python", "SQL", "Rare"])
+        self.assertEqual(result[0]["Resources"][0]["resource"], "Python Docs")
+        self.assertEqual(result[1]["Resources"], [])
+        self.assertIn("50 job-catalog", result[1]["Explanation"])
+        self.assertIn("5 recent India", result[1]["Explanation"])
+
+    def test_recent_demand_can_break_equal_catalog_scores(self):
+        result = build_skill_recommendations(
+            [
+                {"Skill": "A", "Job Demand": 10, "Demand Score": 0.1, "Recent India Listings (48h)": 1},
+                {"Skill": "B", "Job Demand": 10, "Demand Score": 0.1, "Recent India Listings (48h)": 4},
+            ], [], normalize_skill
+        )
+        self.assertEqual([row["Skill"] for row in result], ["B", "A"])
+
+    def test_learning_plan_preserves_prerequisite_order_and_assigns_phases(self):
+        plan = build_learning_plan(["Python", "Pandas", "Data Science"], normalize_skill)
+        self.assertEqual([item["Day"] for item in plan], [30, 60, 90])
+        self.assertEqual([item["Phase"] for item in plan], ["First 30 days", "Days 31–60", "Days 61–90"])
+        self.assertEqual(
+            [skill for phase in plan for skill in phase["Skills"]],
+            ["Python", "Pandas", "Data Science"],
+        )
+        self.assertEqual(build_learning_plan([], normalize_skill)[0]["Skills"], [])
+
+    def test_recommendations_ignore_unknown_or_empty_skill_labels(self):
+        result = build_skill_recommendations(
+            [{"Skill": "", "Job Demand": 0}, {"Skill": "Unknown", "Job Demand": 0}],
+            [], normalize_skill
+        )
+        self.assertEqual([row["Skill"] for row in result], ["Unknown"])
+        self.assertIn("No demand", result[0]["Explanation"])
 
 
 if __name__ == "__main__":

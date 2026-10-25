@@ -22,5 +22,7 @@ jobs:
           python-version: "3.11"
       - name: Run offline tests
         run: python -B -m unittest discover -s data_pipeline -p 'test_*.py' -v
+      - name: Run app helper tests
+        run: python -B -m unittest discover -s tests -p 'test_app_helpers.py' -v
       - name: Check Python syntax
         run: python -B -c "import ast, pathlib; files = [pathlib.Path('app.py'), pathlib.Path('app_helpers.py'), *pathlib.Path('data_pipeline').glob('*.py')]; [ast.parse(p.read_text(encoding='utf-8')) for p in files]; print('Python syntax OK')"

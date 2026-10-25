@@ -1,0 +1,131 @@
+"""Shared application shell and the dashboard landing page."""
+
+import streamlit as st
+
+
+PAGES = ("Dashboard", "Analyze resume")
+
+
+def _open_resume_analysis():
+    st.session_state["app_page"] = "Analyze resume"
+
+
+def apply_app_styles():
+    st.markdown(
+        """
+        <style>
+        :root { --ink: #10182d; --muted: #69758e; --blue: #5574f7; --violet: #895cf6; }
+        [data-testid="stAppViewContainer"] { background: #f6f8fc; }
+        [data-testid="stHeader"] { background: rgba(246,248,252,.92); }
+        [data-testid="stSidebar"] { background: #111a31; border-right: 1px solid #202b45; }
+        [data-testid="stSidebar"] > div:first-child { padding-top: 1.35rem; }
+        [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
+        [data-testid="stSidebar"] [data-testid="stCaptionContainer"] { color: #9eabc7; }
+        [data-testid="stSidebar"] [data-testid="stRadio"] label { color: #dce4f8; }
+        [data-testid="stSidebar"] [data-testid="stRadio"] label p { color: #dce4f8; }
+        .brand-row { display:flex; align-items:center; gap:12px; margin: 2px 0 30px; }
+        .brand-mark { width:38px; height:38px; border-radius:12px; display:grid; place-items:center;
+          color:#fff; font-weight:800; background:linear-gradient(135deg,#5b7bff,#9562f5);
+          box-shadow:0 8px 22px rgba(89,111,242,.3); }
+        .brand-name { color:#f6f8ff; font-size:15px; font-weight:750; letter-spacing:-.2px; }
+        .brand-caption { color:#8997b7; font-size:11px; margin-top:2px; }
+        .side-section { color:#71809f; text-transform:uppercase; letter-spacing:1.2px;
+          font-size:10px; font-weight:750; margin: 0 0 8px; }
+        .side-footer { border-top:1px solid #2a3550; margin-top:28px; padding-top:16px;
+          color:#95a2bd; font-size:12px; line-height:1.55; }
+        .eyebrow { color:#6578c9; text-transform:uppercase; letter-spacing:1.6px;
+          font-size:11px; font-weight:800; margin-bottom:10px; }
+        .dashboard-title { color:var(--ink); font-size:clamp(30px,4vw,43px); line-height:1.12;
+          letter-spacing:-1.7px; font-weight:780; max-width:720px; margin:0 0 12px; }
+        .dashboard-copy { color:var(--muted); font-size:16px; line-height:1.65; max-width:640px; }
+        .hero-panel { position:relative; overflow:hidden; border-radius:24px; padding:36px 38px;
+          background:linear-gradient(118deg,#111a31 0%,#1c2a50 58%,#463a88 100%);
+          color:#fff; box-shadow:0 18px 48px rgba(34,49,91,.15); }
+        .hero-panel:after { content:""; position:absolute; width:260px; height:260px; right:6%; top:-120px;
+          border-radius:50%; border:1px solid rgba(255,255,255,.12);
+          box-shadow:0 0 0 28px rgba(255,255,255,.035),0 0 0 62px rgba(255,255,255,.025); }
+        .hero-kicker { color:#c7d2ff; font-size:12px; font-weight:700; letter-spacing:1.2px;
+          text-transform:uppercase; margin-bottom:12px; }
+        .hero-title { color:#fff; font-size:clamp(25px,3vw,34px); line-height:1.2;
+          font-weight:760; letter-spacing:-.8px; max-width:570px; margin:0 0 10px; }
+        .hero-copy { color:#c1cbe1; line-height:1.6; max-width:560px; font-size:14px; margin-bottom:22px; }
+        .section-title { color:var(--ink); font-size:19px; font-weight:750; letter-spacing:-.35px; }
+        .step-card { background:#fff; border:1px solid #e9edf5; border-radius:17px; padding:20px;
+          min-height:155px; box-shadow:0 5px 18px rgba(25,42,82,.035); }
+        .step-number { color:#687bf0; font-size:11px; font-weight:800; letter-spacing:1.2px; }
+        .step-heading { color:#162039; font-size:15px; font-weight:750; margin:9px 0 6px; }
+        .step-copy { color:#71809a; font-size:13px; line-height:1.5; }
+        [data-testid="stMainBlockContainer"] { padding-top:2rem; padding-bottom:3rem; }
+        @media (max-width:700px) {
+          [data-testid="stMainBlockContainer"] { padding-top:1.2rem; }
+          .hero-panel { padding:26px 22px; border-radius:19px; }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_sidebar():
+    with st.sidebar:
+        st.markdown(
+            '<div class="brand-row"><div class="brand-mark">S</div><div>'
+            '<div class="brand-name">SkillScope</div><div class="brand-caption">Career intelligence</div>'
+            '</div></div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown('<div class="side-section">Workspace</div>', unsafe_allow_html=True)
+        page = st.radio(
+            "Workspace navigation",
+            PAGES,
+            label_visibility="collapsed",
+            key="app_page",
+        )
+        st.markdown(
+            '<div class="side-footer"><strong style="color:#e5ebfa">Your next step, made clearer.</strong>'
+            '<br/>Understand your strengths and build toward the role you want.</div>',
+            unsafe_allow_html=True,
+        )
+    return page
+
+
+def render_dashboard():
+    st.markdown('<div class="eyebrow">Career growth workspace</div>', unsafe_allow_html=True)
+    st.markdown('<div class="dashboard-title">Turn your skills into your next opportunity.</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="dashboard-copy">Get a clearer view of how your experience aligns with a role, '
+        'then focus your learning on the skills that matter.</div>',
+        unsafe_allow_html=True,
+    )
+    st.write("")
+    st.markdown(
+        '<div class="hero-panel"><div class="hero-kicker">A smarter starting point</div>'
+        '<div class="hero-title">Make your next career move with confidence.</div>'
+        '<div class="hero-copy">Bring your resume and a role you have in mind. SkillScope will help '
+        'you understand your match and shape a practical path forward.</div></div>',
+        unsafe_allow_html=True,
+    )
+    st.write("")
+    st.button(
+        "Start with your resume  →",
+        type="primary",
+        key="dashboard_start",
+        on_click=_open_resume_analysis,
+    )
+
+    st.write("")
+    st.markdown('<div class="section-title">A clear path from experience to action</div>', unsafe_allow_html=True)
+    st.caption("Three focused steps to help you move forward.")
+    columns = st.columns(3, gap="medium")
+    cards = (
+        ("01", "Share your experience", "Upload a resume and choose the role you want to explore."),
+        ("02", "See your alignment", "Review your strengths and the skills that could close the gap."),
+        ("03", "Build your next steps", "Use a personalized learning roadmap to keep making progress."),
+    )
+    for column, (number, title, copy) in zip(columns, cards):
+        with column:
+            st.markdown(
+                f'<div class="step-card"><div class="step-number">{number} / 03</div>'
+                f'<div class="step-heading">{title}</div><div class="step-copy">{copy}</div></div>',
+                unsafe_allow_html=True,
+            )

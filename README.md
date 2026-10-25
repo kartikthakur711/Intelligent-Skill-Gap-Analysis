@@ -28,6 +28,7 @@ Resume
 - Missing-skill identification and prioritization
 - Personalized learning roadmap
 - Learning-resource links
+- Saved learning progress for roadmap steps
 - Streamlit web application
 
 ## Run Locally
@@ -133,3 +134,9 @@ The first live GitHub Actions run succeeded on 2026-10-24. API use is bounded to
 ## Current Status
 
 The app remains a prototype. Its compatibility score is trained against a programmatically generated target, not independently labeled hiring outcomes. The pipeline now adds a fresh, limited-window market signal without retraining the model or replacing the catalog.
+
+## Learning Progress and Deployment
+
+After analyzing a resume, mark roadmap steps complete and select **Save progress**. Progress is stored in `data/learning_progress.json` by default. The file is excluded from Git. Set `LEARNING_PROGRESS_FILE` to use another writable local path. A normalized profile label is hashed before it is saved; the raw label and resume contents are not stored in the progress file. Profile labels only separate local records and do not provide authentication or access control. Use a nickname rather than an email address or other sensitive identifier.
+
+The JSON file is written atomically and malformed or unsupported files are left unchanged. This file-based option is suitable for local use or a single app process with durable disk. Many hosted Streamlit environments use ephemeral filesystems, and multiple replicas may have separate files; progress can disappear on restart or differ between replicas. Before deploying there, configure `LEARNING_PROGRESS_FILE` to a durable shared store or replace the file adapter with an authenticated database-backed store. Do not treat the default file as multi-user private storage.

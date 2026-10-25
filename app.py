@@ -14,7 +14,12 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 from data_pipeline.skill_demand import load_headcount_demand as read_headcount_demand
 from data_pipeline.skill_demand import recent_skill_counts
-from app_helpers import build_learning_roadmap, clean_html
+from app_helpers import (
+    build_learning_plan,
+    build_learning_roadmap,
+    build_skill_recommendations,
+    clean_html,
+)
 
 
 APP_DIR = Path(__file__).resolve().parent
@@ -483,8 +488,18 @@ if analyze:
             "react": ["javascript", "html", "css"],
             "spring": ["java", "software development"],
         }
-        roadmap = build_learning_roadmap(missing, dependencies, resume_skills, normalize_skill)
         resources = load_resources()
+        resource_records = resources.fillna("").to_dict(orient="records")
+        recommendations = build_skill_recommendations(
+            priority_df.fillna(0).to_dict(orient="records"),
+            resource_records,
+            normalize_skill,
+        )
+        ranked_missing = [item["Skill"] for item in recommendations] or missing
+        roadmap = build_learning_roadmap(
+            ranked_missing, dependencies, resume_skills, normalize_skill
+        )
+        learning_plan = build_learning_plan(roadmap, normalize_skill)
 
         st.success(f"Analysis completed for **{selected_job['job_title']}**")
 
@@ -518,30 +533,47 @@ if analyze:
             st.caption("Job Demand counts skill occurrences in the loaded job catalog; Demand Score is that count divided by the most frequent catalog skill. These are catalog-frequency measures, not unique vacancies or hiring probabilities. Repeated/template rows can affect the counts.")
             st.dataframe(priority_df, use_container_width=True, hide_index=True)
 
-        st.subheader("Personalized Learning Roadmap")
-        st.caption("The roadmap starts with detected skill gaps and skips prerequisites already detected in your resume.")
+        st.subheader("Personalized Learning Plan")
+        st.caption("Prerequisites come first. Missing skills are ranked using catalog frequency, with recent India listing counts as a modest supplementary signal. The 30/60/90-day groups are suggested pacing, not fixed course durations.")
         if roadmap:
-            for i, skill in enumerate(roadmap, 1):
-                st.write(f"**{i}. {skill.title()}**")
+            for phase in learning_plan:
+                st.markdown(f"**{phase['Phase']}**")
+                if phase["Skills"]:
+                    for skill in phase["Skills"]:
+                        st.write(f"- {skill.title()}")
+                else:
+                    st.caption("Consolidate earlier skills and practice with a small project.")
         else:
             st.write("No additional learning steps are required from the detected job skills.")
 
-        st.subheader("Learning Resources")
+        st.subheader("Ranked Recommendations and Resources")
+        if recommendations:
+            for recommendation in recommendations:
+                st.markdown(f"**{recommendation['Rank']}. {recommendation['Skill'].title()}** — {recommendation['Explanation']}")
+                if recommendation["Resources"]:
+                    for resource in recommendation["Resources"]:
+                        st.markdown(f"[{resource['resource']}]({resource['url']}) · {resource['type']}")
+                else:
+                    st.caption("No resource is mapped for this skill in the existing catalog.")
+        elif roadmap:
+            st.info("No missing job skills need a recommendation.")
         if not resources.empty and roadmap:
+            # Show catalog entries for prerequisite steps too, where available.
             normalized_resources = resources.copy()
             normalized_resources["skill_normalized"] = normalized_resources["skill"].map(normalize_skill)
             selected_resources = normalized_resources[
                 normalized_resources["skill_normalized"].isin({normalize_skill(x) for x in roadmap})
             ][["skill", "resource", "type", "url"]].drop_duplicates()
-            if not selected_resources.empty:
-                st.dataframe(
-                    selected_resources,
-                    use_container_width=True,
-                    hide_index=True,
-                    column_config={"url": st.column_config.LinkColumn("Resource Link")},
-                )
-            else:
+            if selected_resources.empty:
                 st.info("No resource link is currently mapped for the detected roadmap skills.")
+            else:
+                with st.expander("All catalog resources for roadmap skills"):
+                    st.dataframe(
+                        selected_resources,
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config={"url": st.column_config.LinkColumn("Resource Link")},
+                    )
         else:
             st.info("No learning-resource dataset is available yet.")
 

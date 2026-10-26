@@ -1,3 +1,4 @@
+import io
 import csv
 import json
 import tempfile
@@ -78,12 +79,50 @@ class HeadcountImporterTests(unittest.TestCase):
         self.assertEqual(rows, [])
         self.assertEqual(loaded["api_records"], "2")
 
-    def test_retries_transient_gateway_timeout_without_leaking_response(self):
+    def test_transient_504_retries_and_succeeds_respecting_retry_after(self):
+        error = HTTPError("https://api.example.invalid", 504, "timeout", {"Retry-After": "7"}, None)
+        response = io.BytesIO(b'{"data": [], "next_cursor": null}')
+        with patch.object(importer, "urlopen", side_effect=[error, response]) as request, patch.object(importer.time, "sleep") as sleep:
+            result = importer.request_page({"country": "IN"}, "unused-test-token")
+        self.assertEqual(result["data"], [])
+        self.assertEqual(request.call_count, 2)
+        sleep.assert_called_once_with(7.0)
+
+    def test_timeout_retries_with_bounded_backoff(self):
+        response = io.BytesIO(b'{"data": [], "next_cursor": null}')
+        with patch.object(importer, "urlopen", side_effect=[TimeoutError(), response]) as request, patch.object(importer.time, "sleep") as sleep, patch.object(importer.random, "uniform", return_value=1.0):
+            importer.request_page({"country": "IN"}, "unused-test-token")
+        self.assertEqual(request.call_count, 2)
+        sleep.assert_called_once_with(1.0)
+
+    def test_exhausted_transient_retries_fail_honestly(self):
         error = HTTPError("https://api.example.invalid", 504, "timeout", {}, None)
-        with patch.object(importer, "urlopen", side_effect=[error, error, error]) as request, patch.object(importer.time, "sleep"):
+        with patch.object(importer, "urlopen", side_effect=[error] * importer.MAX_REQUEST_ATTEMPTS) as request, patch.object(importer.time, "sleep"), patch.object(importer.random, "uniform", return_value=1.0):
             with self.assertRaisesRegex(RuntimeError, "HTTP 504"):
                 importer.request_page({"country": "IN"}, "unused-test-token")
-        self.assertEqual(request.call_count, 3)
+        self.assertEqual(request.call_count, importer.MAX_REQUEST_ATTEMPTS)
+
+    def test_non_retryable_client_error_fails_without_retry(self):
+        error = HTTPError("https://api.example.invalid", 400, "bad request", {}, None)
+        with patch.object(importer, "urlopen", side_effect=error) as request, patch.object(importer.time, "sleep") as sleep:
+            with self.assertRaisesRegex(RuntimeError, "HTTP 400"):
+                importer.request_page({"country": "IN"}, "unused-test-token")
+        request.assert_called_once()
+        sleep.assert_not_called()
+
+    def test_failed_later_page_preserves_last_known_good_snapshot_pair(self):
+        self.output.parent.mkdir(parents=True, exist_ok=True)
+        original_csv = "known-good aggregate\n"
+        original_metadata = '{"known_good": true}\n'
+        self.output.write_text(original_csv, encoding="utf-8")
+        metadata_path = self.output.with_suffix(".metadata.json")
+        metadata_path.write_text(original_metadata, encoding="utf-8")
+        first_page = {"data": [{"job_id": "new", "title": "Engineer", "description": "Python"}], "next_cursor": "next", "snapshot_watermark": "w"}
+        with patch.object(importer, "request_page", side_effect=[first_page, RuntimeError("Headcount API returned HTTP 504")]):
+            with self.assertRaisesRegex(RuntimeError, "HTTP 504"):
+                importer.run(self.catalog, self.output, api_key="unused-test-token", posted_since="2026-10-22T00:00:00Z")
+        self.assertEqual(self.output.read_text(encoding="utf-8"), original_csv)
+        self.assertEqual(metadata_path.read_text(encoding="utf-8"), original_metadata)
 
     def test_requires_secret_without_showing_it(self):
         with self.assertRaisesRegex(ValueError, "HEADCOUNT_API_KEY is required"):

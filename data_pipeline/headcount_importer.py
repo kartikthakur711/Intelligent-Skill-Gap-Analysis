@@ -10,12 +10,16 @@ import argparse
 import ast
 import csv
 import json
+import logging
 import os
+import random
 import re
+import socket
 import sys
 import time
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -25,6 +29,12 @@ API_BASE = "https://api.headcountlabs.com"
 FIELDS = "job_id,title,description"
 APP_COLUMNS = ("job_id", "category", "job_title", "job_description", "job_skill_set")
 OUTPUT_COLUMNS = ("category", "skill", "distinct_job_count", "window_start_utc", "generated_at_utc")
+REQUEST_TIMEOUT_SECONDS = 20
+MAX_REQUEST_ATTEMPTS = 4
+RETRY_BASE_SECONDS = 1.0
+RETRY_MAX_SECONDS = 30.0
+TRANSIENT_HTTP_CODES = {408, 429, 500, 502, 503, 504}
+LOGGER = logging.getLogger(__name__)
 
 
 def normalize(value: object) -> str:
@@ -63,24 +73,54 @@ def load_taxonomy(catalog_path: Path) -> dict[str, set[str]]:
     return dict(taxonomy)
 
 
-def request_page(params: dict[str, str], api_key: str, timeout: int = 30) -> dict:
+def retry_after_seconds(value: str | None, *, now: datetime | None = None) -> float | None:
+    """Parse Retry-After as delay-seconds or an HTTP date."""
+    if not value:
+        return None
+    try:
+        return max(0.0, float(value.strip()))
+    except ValueError:
+        try:
+            retry_at = parsedate_to_datetime(value)
+            if retry_at.tzinfo is None:
+                retry_at = retry_at.replace(tzinfo=timezone.utc)
+            current = now or datetime.now(timezone.utc)
+            return max(0.0, (retry_at - current).total_seconds())
+        except (TypeError, ValueError, OverflowError):
+            return None
+
+
+def request_page(params: dict[str, str], api_key: str, timeout: int = REQUEST_TIMEOUT_SECONDS) -> dict:
     query = urlencode(params)
     request = Request(
         f"{API_BASE}/v1/jobs?{query}",
         headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
     )
-    for attempt in range(3):
+    for attempt in range(1, MAX_REQUEST_ATTEMPTS + 1):
         try:
             with urlopen(request, timeout=timeout) as response:
                 payload = json.load(response)
             break
         except HTTPError as exc:
             # Never include response text or request headers: either could contain secrets.
-            if exc.code in {503, 504} and attempt < 2:
-                time.sleep(attempt + 1)
-                continue
-            raise RuntimeError(f"Headcount API returned HTTP {exc.code}") from None
-        except (URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+            if exc.code not in TRANSIENT_HTTP_CODES or attempt == MAX_REQUEST_ATTEMPTS:
+                LOGGER.error("Headcount request failed with HTTP %s (attempt %s/%s)", exc.code, attempt, MAX_REQUEST_ATTEMPTS)
+                raise RuntimeError(f"Headcount API returned HTTP {exc.code}") from None
+            retry_after = retry_after_seconds(exc.headers.get("Retry-After") if exc.headers else None)
+            delay = min(RETRY_MAX_SECONDS, retry_after) if retry_after is not None else min(RETRY_MAX_SECONDS, RETRY_BASE_SECONDS * (2 ** (attempt - 1))) * random.uniform(0.5, 1.5)
+            LOGGER.warning("Headcount returned HTTP %s; retrying in %.1f seconds (attempt %s/%s)", exc.code, delay, attempt, MAX_REQUEST_ATTEMPTS)
+            time.sleep(delay)
+            continue
+        except (URLError, TimeoutError, socket.timeout, ConnectionError) as exc:
+            if attempt == MAX_REQUEST_ATTEMPTS:
+                LOGGER.error("Headcount request failed after %s attempts (%s)", MAX_REQUEST_ATTEMPTS, type(exc).__name__)
+                raise RuntimeError(f"Headcount API request failed after {MAX_REQUEST_ATTEMPTS} attempts ({type(exc).__name__})") from None
+            delay = min(RETRY_MAX_SECONDS, RETRY_BASE_SECONDS * (2 ** (attempt - 1))) * random.uniform(0.5, 1.5)
+            LOGGER.warning("Headcount request timed out or failed (%s); retrying in %.1f seconds (attempt %s/%s)", type(exc).__name__, delay, attempt, MAX_REQUEST_ATTEMPTS)
+            time.sleep(delay)
+            continue
+        except (OSError, json.JSONDecodeError) as exc:
+            LOGGER.error("Headcount request failed (%s); not retrying", type(exc).__name__)
             raise RuntimeError(f"Headcount API request failed ({type(exc).__name__})") from None
     if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
         raise RuntimeError("Headcount API returned an unexpected response shape")

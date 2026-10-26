@@ -93,6 +93,14 @@ def apply_app_styles():
         .score-ring-label { color:#cbd5f1; font-size:10px; font-weight:650; margin-top:5px; }
         .score-title { color:#fff; font-size:16px; font-weight:750; margin-bottom:6px; }
         .score-description { color:#cbd5e8; font-size:12px; line-height:1.55; max-width:280px; }
+        .stApp [data-testid="stCaptionContainer"] { color:#59657c; }
+        .stApp [data-testid="stVerticalBlockBorderWrapper"] {
+          background:#fff; border-color:#e5eaf3; border-radius:16px;
+          box-shadow:0 5px 18px rgba(25,42,82,.035);
+        }
+        .stApp [data-testid="stMetric"] { min-height:110px; }
+        .stApp [data-testid="stProgressBar"] { margin-top:10px; }
+        .stApp [data-testid="stDataFrame"] { background:#fff; }
         [data-testid="stMainBlockContainer"] { padding-top:2rem; padding-bottom:3rem; }
         @media (max-width:700px) {
           [data-testid="stMainBlockContainer"] { padding-top:1.2rem; }

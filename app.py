@@ -673,11 +673,53 @@ else:
                     )
                 elif recent_counts is None:
                     st.caption("Daily India listing data is not available yet; priorities use the existing catalog.")
-                st.caption("Job Demand counts skill occurrences in the loaded job catalog; Demand Score is that count divided by the most frequent catalog skill. These are catalog-frequency measures, not unique vacancies or hiring probabilities. Repeated/template rows can affect the counts.")
-                st.dataframe(priority_df, use_container_width=True, hide_index=True)
+                st.caption("Priority reflects skill frequency in the loaded catalog. Recent listing counts are a separate limited sample, not vacancy totals or hiring probabilities.")
+
+                priority_metrics = st.columns(3, gap="medium")
+                priority_metrics[0].metric("Skills to build", len(priority_df))
+                priority_metrics[1].metric("High priority", int((priority_df["Priority"] == "High").sum()))
+                if "Recent India Listings (48h)" in priority_df.columns:
+                    recent_skill_total = int((priority_df["Recent India Listings (48h)"] > 0).sum())
+                    recent_value = f"{recent_skill_total} skills observed"
+                else:
+                    recent_value = "Unavailable"
+                priority_metrics[2].metric("Recent listing signal", recent_value)
+
+                chart_data = priority_df[["Skill", "Demand Score"]].set_index("Skill")
+                st.bar_chart(chart_data, horizontal=True, height=max(220, 52 * len(chart_data)))
+                with st.expander("View the underlying skill metrics"):
+                    st.dataframe(
+                        priority_df,
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config={
+                            "Demand Score": st.column_config.ProgressColumn(
+                                "Relative catalog frequency",
+                                help="Skill occurrences divided by the most frequent skill in the loaded catalog.",
+                                min_value=0,
+                                max_value=1,
+                                format="%.0f%%",
+                            )
+                        },
+                    )
 
             st.subheader("Personalized Learning Plan")
-            st.caption("Prerequisites come first. Missing skills are ranked using catalog frequency, with recent India listing counts as a modest supplementary signal. The 30/60/90-day groups are suggested pacing, not fixed course durations.")
+            st.caption("Work through these suggested phases in order. Timing is a flexible pacing guide; the sequence reflects prerequisites and your prioritized skill gaps.")
+            if roadmap:
+                phase_columns = st.columns(3, gap="medium")
+                for index, (phase_column, phase) in enumerate(zip(phase_columns, learning_plan), start=1):
+                    with phase_column:
+                        with st.container(border=True):
+                            st.caption(f"PHASE {index:02d}")
+                            st.markdown(f"**{phase['Phase']}**")
+                            st.metric("Focus skills", len(phase["Skills"]))
+                            if phase["Skills"]:
+                                st.write(" · ".join(skill.title() for skill in phase["Skills"]))
+                            else:
+                                st.caption("Consolidate earlier skills and practice with a small project.")
+            else:
+                st.info("No additional learning steps are required from the detected job skills.")
+
             if roadmap:
                 for phase in learning_plan:
                     with st.container(border=True):
@@ -744,18 +786,34 @@ else:
                         st.error(str(exc))
                 progress_count = len(selected_completed)
                 progress_ratio = progress_count / len(roadmap)
-                st.progress(progress_ratio, text=f"{progress_count} of {len(roadmap)} steps completed")
-                st.caption("Progress is stored at the configured local file path.")
+                progress_metric, progress_detail = st.columns([0.8, 1.2], gap="medium")
+                progress_metric.metric(
+                    "Plan progress",
+                    f"{progress_count} / {len(roadmap)} steps",
+                    delta=f"{progress_ratio * 100:.0f}% complete",
+                    delta_color="normal",
+                )
+                with progress_detail:
+                    st.progress(progress_ratio, text="Learning plan completion")
+                    st.caption("Your checklist is saved locally for this profile and role.")
 
-            st.subheader("Ranked Recommendations and Resources")
+            st.subheader("Recommended next steps")
+            st.caption("Resources are shown alongside the skill they support.")
             if recommendations:
                 for recommendation in recommendations:
-                    st.markdown(f"**{recommendation['Rank']}. {recommendation['Skill'].title()}** — {recommendation['Explanation']}")
-                    if recommendation["Resources"]:
-                        for resource in recommendation["Resources"]:
-                            st.markdown(f"[{resource['resource']}]({resource['url']}) · {resource['type']}")
-                    else:
-                        st.caption("No resource is mapped for this skill in the existing catalog.")
+                    with st.container(border=True):
+                        resource_col, link_col = st.columns([1.5, 1], gap="medium")
+                        with resource_col:
+                            st.caption(f"PRIORITY {int(recommendation['Rank']):02d}")
+                            st.markdown(f"**{recommendation['Skill'].title()}**")
+                            st.write(recommendation["Explanation"])
+                        with link_col:
+                            if recommendation["Resources"]:
+                                for resource in recommendation["Resources"]:
+                                    st.markdown(f"[{resource['resource']}]({resource['url']})")
+                                    st.caption(resource["type"])
+                            else:
+                                st.caption("No resource is mapped for this skill in the existing catalog.")
             elif roadmap:
                 st.info("No missing job skills need a recommendation.")
             if not resources.empty and roadmap:

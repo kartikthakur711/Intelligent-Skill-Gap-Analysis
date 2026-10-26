@@ -20,6 +20,7 @@ from app_helpers import (
     build_skill_recommendations,
     clean_html,
 )
+from dashboard_ui import apply_app_styles, render_dashboard, render_sidebar
 
 
 APP_DIR = Path(__file__).resolve().parent
@@ -44,6 +45,7 @@ st.set_page_config(
     page_icon="🎯",
     layout="wide",
 )
+apply_app_styles()
 
 
 # -----------------------------
@@ -371,6 +373,11 @@ def priority_from_demand(missing_skills, catalog, recent_counts=None):
 # -----------------------------
 # UI
 # -----------------------------
+page = render_sidebar()
+if page == "Dashboard":
+    render_dashboard()
+    st.stop()
+
 st.title("🎯 Intelligent Skill Gap Analysis & Personalized Learning")
 st.write("Upload your resume and enter the target job title. The system retrieves the job, predicts compatibility, identifies skill gaps, and builds a learning roadmap.")
 

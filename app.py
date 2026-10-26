@@ -25,6 +25,7 @@ from app_helpers import (
 )
 from learning_progress import ProgressStoreError, load_progress, save_progress, summarize_progress
 from dashboard_ui import apply_app_styles, render_dashboard, render_sidebar
+from role_discovery import catalog_roles
 
 
 APP_DIR = Path(__file__).resolve().parent
@@ -383,6 +384,7 @@ def priority_from_demand(missing_skills, catalog, recent_counts=None):
 # -----------------------------
 page = render_sidebar()
 if page == "Dashboard":
+    dashboard_roles = []
     dashboard_demand = []
     dashboard_demand_metadata = None
     dashboard_snapshot_status = summarize_recent_snapshot(None, None)
@@ -390,6 +392,7 @@ if page == "Dashboard":
     dashboard_recent_demand = []
     try:
         dashboard_catalog = load_job_catalog()
+        dashboard_roles = catalog_roles(dashboard_catalog)
         dashboard_demand = build_dashboard_skill_demand(
             dashboard_catalog["skills_list"].tolist(), None, normalize_skill
         )
@@ -429,13 +432,29 @@ if page == "Dashboard":
         dashboard_progress_error,
         dashboard_snapshot_status,
         dashboard_recent_demand,
+        dashboard_roles,
     )
 else:
     st.title("🎯 Intelligent Skill Gap Analysis & Personalized Learning")
     st.write("Upload your resume and enter the target job title. The system retrieves the job, predicts compatibility, identifies skill gaps, and builds a learning roadmap.")
 
     uploaded = st.file_uploader("Upload Resume", type=["pdf", "docx", "txt"])
-    job_title = st.text_input("Target Job Title", placeholder="e.g., Data Scientist")
+    try:
+        available_roles = [role["Job title"] for role in catalog_roles(load_job_catalog())]
+    except Exception:
+        available_roles = []
+    selected_role = st.selectbox(
+        "Browse available catalog titles",
+        [""] + available_roles,
+        format_func=lambda value: "Choose a title or enter your own" if not value else value,
+        key="analysis_catalog_role",
+    )
+    job_title = st.text_input(
+        "Target Job Title",
+        value=selected_role,
+        placeholder="e.g., Data Scientist",
+        help="Use a catalog title for a direct match, or enter another title to try conservative matching.",
+    )
 
     analyze = st.button("Analyze Resume", type="primary", use_container_width=True)
 

@@ -26,5 +26,7 @@ jobs:
         run: python -B -m unittest discover -s tests -p 'test_app_helpers.py' -v
       - name: Run learning progress tests
         run: python -B -m unittest discover -s tests -p 'test_learning_progress.py' -v
+      - name: Run role discovery tests
+        run: python -B -m unittest discover -s tests -p 'test_role_discovery.py' -v
       - name: Check Python syntax
-        run: python -B -c "import ast, pathlib; files = [pathlib.Path('app.py'), pathlib.Path('app_helpers.py'), pathlib.Path('dashboard_ui.py'), pathlib.Path('learning_progress.py'), *pathlib.Path('data_pipeline').glob('*.py')]; [ast.parse(p.read_text(encoding='utf-8')) for p in files]; print('Python syntax OK')"
+        run: python -B -c "import ast, pathlib; files = [pathlib.Path('app.py'), pathlib.Path('app_helpers.py'), pathlib.Path('dashboard_ui.py'), pathlib.Path('learning_progress.py'), pathlib.Path('role_discovery.py'), *pathlib.Path('data_pipeline').glob('*.py')]; [ast.parse(p.read_text(encoding='utf-8')) for p in files]; print('Python syntax OK')"

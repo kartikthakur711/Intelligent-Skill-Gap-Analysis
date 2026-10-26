@@ -55,6 +55,8 @@ def apply_app_styles():
         .step-number { color:#687bf0; font-size:11px; font-weight:800; letter-spacing:1.2px; }
         .step-heading { color:#162039; font-size:15px; font-weight:750; margin:9px 0 6px; }
         .step-copy { color:#71809a; font-size:13px; line-height:1.5; }
+[data-testid="stTextInput"] input, [data-testid="stSelectbox"] [role="combobox"] { border-radius:10px; }
+[data-testid="stDataFrame"] { border:1px solid #e9edf5; border-radius:12px; overflow:hidden; }
         [data-testid="stMainBlockContainer"] { padding-top:2rem; padding-bottom:3rem; }
         @media (max-width:700px) {
           [data-testid="stMainBlockContainer"] { padding-top:1.2rem; }
@@ -89,7 +91,7 @@ def render_sidebar():
     return page
 
 
-def render_dashboard(demand_rows=None, demand_metadata=None, progress_summary=None, progress_error=None, snapshot_status=None, recent_demand_rows=None):
+def render_dashboard(demand_rows=None, demand_metadata=None, progress_summary=None, progress_error=None, snapshot_status=None, recent_demand_rows=None, role_rows=None):
     st.markdown('<div class="eyebrow">Career growth workspace</div>', unsafe_allow_html=True)
     st.markdown('<div class="dashboard-title">Turn your skills into your next opportunity.</div>', unsafe_allow_html=True)
     st.markdown(
@@ -116,6 +118,29 @@ def render_dashboard(demand_rows=None, demand_metadata=None, progress_summary=No
         st.cache_data.clear()
         st.rerun()
     st.caption("Reload reads the catalog and latest bundled snapshot from disk. It does not start a new listings import.")
+
+    st.write("")
+    st.markdown('<div class="section-title">Explore job titles</div>', unsafe_allow_html=True)
+    st.caption("Search unique titles represented by actual rows in the bundled job catalog. Catalog rows may be repeated templates; they are not live vacancies.")
+    if role_rows:
+        roles = role_rows.copy()
+        family_values = sorted({category for role in roles for category in role["Categories"].split(", ") if category})
+        search_col, family_col = st.columns([1.4, 1], gap="medium")
+        with search_col:
+            title_query = st.text_input("Search job titles", placeholder="Try ‘backend’, ‘data’, or ‘cloud’", key="role_search")
+        with family_col:
+            selected_family = st.selectbox("Catalog category", ["All categories", *family_values], key="role_category")
+        query = title_query.strip().casefold()
+        filtered = [role for role in roles if query in role["Job title"].casefold()
+                    and (selected_family == "All categories" or selected_family in role["Categories"].split(", "))]
+        st.metric("Distinct catalog titles", len(roles))
+        if filtered:
+            st.dataframe(filtered, use_container_width=True, hide_index=True)
+        else:
+            st.info("No catalog titles match those filters. Try another search or select all categories.")
+        st.caption("The bundled catalog has no per-title source timestamps. Its title list is a static dataset snapshot, not a current market inventory.")
+    else:
+        st.info("Job-title discovery is unavailable because the bundled catalog could not be loaded.")
 
     st.write("")
     st.markdown('<div class="section-title">A clear path from experience to action</div>', unsafe_allow_html=True)

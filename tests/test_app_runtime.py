@@ -29,6 +29,9 @@ class AppRuntimeTests(unittest.TestCase):
         self.assertTrue(any("Skills appearing in the job catalog" in item.value for item in app.subheader))
         self.assertTrue(any("Saved learning progress" in item.value for item in app.subheader))
         self.assertTrue(any("Saved learning plans" in metric.label for metric in app.metric))
+        self.assertTrue(any("Distinct catalog titles" == metric.label and metric.value == "12" for metric in app.metric))
+        self.assertTrue(any(item.label == "Search job titles" for item in app.text_input))
+        self.assertTrue(any(item.label == "Catalog category" for item in app.selectbox))
         self.assertTrue(app.dataframe)
         self.assertTrue(any("Start with your resume" in button.label for button in app.button))
 
@@ -39,6 +42,8 @@ class AppRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(app.radio[0].value, "Analyze resume")
         self.assertEqual(len(app.file_uploader), 1)
+        self.assertTrue(any(item.label == "Browse available catalog titles" for item in app.selectbox))
+        self.assertTrue(any(item.label == "Target Job Title" for item in app.text_input))
         self.assertTrue(any(button.label == "Analyze Resume" for button in app.button))
 
     def test_dashboard_data_present_empty_missing_and_malformed_sources(self):

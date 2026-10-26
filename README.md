@@ -87,6 +87,10 @@ The daily listing importer runs in GitHub Actions and needs `HEADCOUNT_API_KEY` 
 
 The GitHub repository currently contains a **3,200-row job catalog**, including approximately **1,000 Machine Learning Engineer rows**. This is the repository's compact catalog, not the separate 100,000-row catalog previously used in the development environment.
 
+The bundled catalog currently contains **12 distinct normalized job titles** across five categories. The dashboard's **Explore job titles** section supports title search and category filtering, and the resume-analysis page offers those titles as selectable suggestions. The catalog has no per-record source timestamps and includes repeated/template descriptions, so its role list is a static dataset snapshot rather than a fresh or comprehensive view of the job market. Do not interpret catalog row totals as vacancies. The current Headcount workflow publishes only limited-window skill aggregates, not role titles; its latest committed metadata records 10 API records at `2026-10-26T11:02:25Z`, which is too small to claim broad market coverage.
+
+The app intentionally does not add unsourced titles or allow a title-only recent listing to masquerade as a skill-bearing job record. Adding more analyzable roles requires a reliable source that provides real title and usable skill/description records together, plus a safe pipeline publication and validation of those records. The bundled model, scoring behavior, and saved progress are unchanged.
+
 Important data-quality note: the catalog contains repeated/template job descriptions and skill combinations. Row count must not be interpreted as the number of distinct real-world job vacancies. The daily data pipeline in `data_pipeline/` adds deduplication and quality-reporting foundations before any refreshed data is used by the app.
 
 The app-compatible catalog columns are:

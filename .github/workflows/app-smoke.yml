@@ -15,6 +15,7 @@ on:
       - 'job_catalog.csv'
       - 'data_pipeline/headcount_skill_demand.csv'
       - 'data_pipeline/headcount_skill_demand.metadata.json'
+      - 'tests/test_app_runtime.py'
       - '.github/workflows/app-smoke.yml'
   pull_request:
     branches:
@@ -29,6 +30,7 @@ on:
       - 'job_catalog.csv'
       - 'data_pipeline/headcount_skill_demand.csv'
       - 'data_pipeline/headcount_skill_demand.metadata.json'
+      - 'tests/test_app_runtime.py'
       - '.github/workflows/app-smoke.yml'
 
 permissions:
@@ -66,23 +68,4 @@ jobs:
           print(f"Model smoke passed; catalog rows: {len(catalog)}")
           PY
       - name: Render initial app screen
-        run: |
-          python - <<'PY'
-          from streamlit.testing.v1 import AppTest
-
-          app = AppTest.from_file("app.py").run(timeout=60)
-          assert not app.exception, [exception.message for exception in app.exception]
-          assert app.radio[0].value == "Dashboard"
-          assert any("Turn your skills into your next opportunity." in item.value for item in app.markdown)
-          assert any("Skills appearing in the job catalog" in item.value for item in app.subheader)
-          assert any("Saved learning progress" in item.value for item in app.subheader)
-          assert any("Saved learning plans" in metric.label for metric in app.metric)
-          assert app.dataframe
-          assert any("Start with your resume" in button.label for button in app.button)
-          app.button[0].click().run(timeout=60)
-          assert not app.exception, [exception.message for exception in app.exception]
-          assert app.radio[0].value == "Analyze resume"
-          assert len(app.file_uploader) == 1
-          assert any(button.label == "Analyze Resume" for button in app.button)
-          print("Dashboard render and navigation passed")
-          PY
+        run: python -B -m unittest discover -s tests -p 'test_app_runtime.py' -v

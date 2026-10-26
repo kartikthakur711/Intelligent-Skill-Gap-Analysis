@@ -24,13 +24,16 @@ def build_learning_roadmap(
     known = {normalize_skill(skill) for skill in (known_skills or [])}
     result = []
     seen = set()
+    visiting = set()
 
     def add(skill):
         key = normalize_skill(skill)
-        if not key or key in known or key in seen:
+        if not key or key in known or key in seen or key in visiting:
             return
+        visiting.add(key)
         for prerequisite in dependencies.get(key, []):
             add(prerequisite)
+        visiting.remove(key)
         seen.add(key)
         result.append(skill)
 
@@ -156,3 +159,4 @@ def summarize_recent_snapshot(rows, metadata, now=None, stale_after_hours=36):
         state = "available"
         message = f"The snapshot checked {api_records} API records ({processed_jobs} usable descriptions) and matched {len(rows)} category/skill pairs. A zero for a skill means it was not matched in this limited sample."
     return {"state": state, "message": message, "age_hours": age_hours}
+

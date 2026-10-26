@@ -67,6 +67,22 @@ To run the pipeline offline tests locally:
 python -B -m unittest discover -s data_pipeline -p 'test_*.py' -v
 ```
 
+## Demonstration Walkthrough
+
+1. Start the app and open **Analyze resume** from the sidebar.
+2. Upload a text-based PDF, DOCX, or TXT resume and enter a role represented in the catalog, such as **Machine Learning Engineer**, **Data Scientist**, or **Software Engineer**.
+3. Review the selected role, compatibility estimate, matched skills, and missing skills. The estimate is a prototype score trained on constructed labels; it is not a hiring probability.
+4. Follow the ranked learning plan, open the linked resources, mark completed steps, and save progress under a nickname. Use a non-sensitive label because profile separation is local convenience, not authentication.
+5. Return to **Dashboard** to show catalog skill mentions, the separate recent-listing snapshot when available, and saved progress totals.
+
+The first resume analysis may download the `all-MiniLM-L6-v2` sentence model. Allow internet access for that first run, or pre-cache the model in the runtime image. The bundled model artifact and catalog are used as-is; the demonstration does not retrain them.
+
+## Deployment Preparation
+
+The app is ready to run as a single Streamlit process when its bundled model, catalog, and resource CSV are present. Before hosting it, configure a writable durable location for `LEARNING_PROGRESS_FILE`; the default local JSON file is excluded from Git, is not authenticated, and is not suitable for multiple replicas without shared storage and application-level access controls. If using multiple app instances, mount the same catalog and demand snapshot on each instance or configure `SKILLSCOPE_JOB_CATALOG`, `SKILLSCOPE_DEMAND_CSV`, and `SKILLSCOPE_DEMAND_METADATA` consistently.
+
+The daily listing importer runs in GitHub Actions and needs `HEADCOUNT_API_KEY` as an Actions secret. The Streamlit app does not need that secret. The workflow publishes only bounded category/skill aggregates and metadata; it does not replace the model or job catalog. Review workflow permissions, secret availability, snapshot freshness, persistent storage, and the first-run sentence model download before a live demonstration or hosted rollout.
+
 ## Dataset
 
 The GitHub repository currently contains a **3,200-row job catalog**, including approximately **1,000 Machine Learning Engineer rows**. This is the repository's compact catalog, not the separate 100,000-row catalog previously used in the development environment.
@@ -150,3 +166,4 @@ After analyzing a resume, mark roadmap steps complete and select **Save progress
 The JSON file is written atomically and malformed or unsupported files are left unchanged. This file-based option is suitable for local use or a single app process with durable disk. Many hosted Streamlit environments use ephemeral filesystems, and multiple replicas may have separate files; progress can disappear on restart or differ between replicas. Before deploying there, configure `LEARNING_PROGRESS_FILE` to a durable shared store or replace the file adapter with an authenticated database-backed store. Do not treat the default file as multi-user private storage.
 
 The dashboard source paths may be overridden with `SKILLSCOPE_JOB_CATALOG`, `SKILLSCOPE_DEMAND_CSV`, and `SKILLSCOPE_DEMAND_METADATA`. Keep these files available to every app instance. A manual dashboard reload only sees files mounted in the current instance; deploy the published daily snapshot or provide a shared durable mount to keep replicas consistent. The current file-backed progress store is also local to each instance unless configured on shared durable storage.
+

@@ -9,9 +9,12 @@ on:
       - 'app.py'
       - 'app_helpers.py'
       - 'dashboard_ui.py'
+      - 'learning_progress.py'
       - 'requirements.txt'
       - 'resume_job_ml_model.pkl'
       - 'job_catalog.csv'
+      - 'data_pipeline/headcount_skill_demand.csv'
+      - 'data_pipeline/headcount_skill_demand.metadata.json'
       - '.github/workflows/app-smoke.yml'
   pull_request:
     branches:
@@ -20,9 +23,12 @@ on:
       - 'app.py'
       - 'app_helpers.py'
       - 'dashboard_ui.py'
+      - 'learning_progress.py'
       - 'requirements.txt'
       - 'resume_job_ml_model.pkl'
       - 'job_catalog.csv'
+      - 'data_pipeline/headcount_skill_demand.csv'
+      - 'data_pipeline/headcount_skill_demand.metadata.json'
       - '.github/workflows/app-smoke.yml'
 
 permissions:
@@ -68,11 +74,15 @@ jobs:
           assert not app.exception, [exception.message for exception in app.exception]
           assert app.radio[0].value == "Dashboard"
           assert any("Turn your skills into your next opportunity." in item.value for item in app.markdown)
+          assert any("Skills appearing in the job catalog" in item.value for item in app.subheader)
+          assert any("Saved learning progress" in item.value for item in app.subheader)
+          assert any("Saved learning plans" in metric.label for metric in app.metric)
+          assert app.dataframe
           assert any("Start with your resume" in button.label for button in app.button)
-          app.radio[0].set_value("Analyze resume").run(timeout=60)
+          app.button[0].click().run(timeout=60)
           assert not app.exception, [exception.message for exception in app.exception]
-          assert any("Intelligent Skill Gap Analysis" in title.value for title in app.title)
+          assert app.radio[0].value == "Analyze resume"
           assert len(app.file_uploader) == 1
           assert any(button.label == "Analyze Resume" for button in app.button)
-          print("Dashboard render and resume-analysis navigation passed")
+          print("Dashboard render and navigation passed")
           PY

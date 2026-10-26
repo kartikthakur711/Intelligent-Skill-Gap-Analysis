@@ -72,7 +72,7 @@ class HeadcountImporterTests(unittest.TestCase):
     def test_reader_keeps_metadata_for_header_only_aggregate(self):
         self.output.parent.mkdir(parents=True, exist_ok=True)
         self.output.write_text(",".join(importer.OUTPUT_COLUMNS) + "\n", encoding="utf-8")
-        metadata = {"generated_at_utc": "now", "window_start_utc": "2026-10-22T00:00:00Z", "api_records": 2, "processed_jobs": 0, "category_skill_pairs": 0, "snapshot_watermark": "2026-10-21T22:10:37Z"}
+        metadata = {"generated_at_utc": "2026-10-24T00:00:00Z", "window_start_utc": "2026-10-22T00:00:00Z", "api_records": 2, "processed_jobs": 0, "category_skill_pairs": 0, "snapshot_watermark": "2026-10-21T22:10:37Z"}
         self.output.with_suffix(".metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
         rows, loaded = load_headcount_demand(self.output, importer.normalize)
         self.assertEqual(rows, [])
@@ -98,13 +98,25 @@ class HeadcountImporterTests(unittest.TestCase):
             "Data,Python,2,2026-10-22T00:00:00Z,2026-10-24T00:00:00Z\n",
             encoding="utf-8",
         )
-        aggregate.with_suffix(".metadata.json").write_text(json.dumps({"generated_at_utc":"2026-10-24T00:00:00Z", "window_start_utc":"2026-10-22T00:00:00Z", "api_records":2, "processed_jobs":2, "category_skill_pairs":1}), encoding="utf-8")
+        aggregate.with_suffix(".metadata.json").write_text(json.dumps({"generated_at_utc":"2026-10-24T00:00:00Z", "window_start_utc":"2026-10-22T00:00:00Z", "api_records":2, "processed_jobs":2, "category_skill_pairs":2}), encoding="utf-8")
         rows, metadata = load_headcount_demand(aggregate, importer.normalize)
         self.assertEqual(recent_skill_counts(rows), {"python": 3})
         self.assertEqual(metadata["generated_at_utc"], "2026-10-24T00:00:00Z")
 
     def test_app_reader_falls_back_when_aggregate_is_missing(self):
         rows, metadata = load_headcount_demand(self.root / "missing.csv", importer.normalize)
+        self.assertIsNone(rows)
+        self.assertIsNone(metadata)
+
+    def test_app_reader_rejects_malformed_rows_instead_of_treating_them_as_empty(self):
+        aggregate = self.root / "malformed.csv"
+        aggregate.write_text(
+            "category,skill,distinct_job_count,window_start_utc,generated_at_utc\n"
+            "AI,Python,not-a-count,2026-10-22T00:00:00Z,2026-10-24T00:00:00Z\n",
+            encoding="utf-8",
+        )
+        aggregate.with_suffix(".metadata.json").write_text(json.dumps({"generated_at_utc":"2026-10-24T00:00:00Z", "window_start_utc":"2026-10-22T00:00:00Z", "api_records":1, "processed_jobs":1, "category_skill_pairs":1}), encoding="utf-8")
+        rows, metadata = load_headcount_demand(aggregate, importer.normalize)
         self.assertIsNone(rows)
         self.assertIsNone(metadata)
 

@@ -89,7 +89,7 @@ def render_sidebar():
     return page
 
 
-def render_dashboard(demand_rows=None, demand_metadata=None, progress_summary=None, progress_error=None):
+def render_dashboard(demand_rows=None, demand_metadata=None, progress_summary=None, progress_error=None, snapshot_status=None, recent_demand_rows=None):
     st.markdown('<div class="eyebrow">Career growth workspace</div>', unsafe_allow_html=True)
     st.markdown('<div class="dashboard-title">Turn your skills into your next opportunity.</div>', unsafe_allow_html=True)
     st.markdown(
@@ -112,6 +112,10 @@ def render_dashboard(demand_rows=None, demand_metadata=None, progress_summary=No
         key="dashboard_start",
         on_click=_open_resume_analysis,
     )
+    if st.button("Reload dashboard data", key="dashboard_refresh"):
+        st.cache_data.clear()
+        st.rerun()
+    st.caption("Reload reads the catalog and latest bundled snapshot from disk. It does not start a new listings import.")
 
     st.write("")
     st.markdown('<div class="section-title">A clear path from experience to action</div>', unsafe_allow_html=True)
@@ -137,17 +141,33 @@ def render_dashboard(demand_rows=None, demand_metadata=None, progress_summary=No
         st.subheader("Skills appearing in the job catalog")
         if demand_rows:
             st.dataframe(demand_rows, use_container_width=True, hide_index=True)
+            st.markdown("**Most mentioned catalog skills**")
+            st.bar_chart({row["Skill"]: row["Catalog mentions"] for row in demand_rows}, horizontal=True)
             st.caption(
                 "Counts are skill mentions in the included catalog. Repeated or template rows can affect them; "
                 "they are not counts of distinct vacancies or hiring probabilities."
             )
             if demand_metadata:
                 st.caption(
-                    "Recent India listings are a separate, limited snapshot, generated "
+                    "Recent India listings are a separate, limited 48-hour posting-window snapshot, generated "
                     f"{demand_metadata.get('generated_at_utc', 'at an unknown time')} UTC."
                 )
+                if snapshot_status:
+                    if snapshot_status["state"] in {"no_listings", "no_skill_matches", "unavailable"}:
+                        st.info(snapshot_status["message"])
+                    elif snapshot_status["state"] == "stale":
+                        st.warning(snapshot_status["message"])
+                    else:
+                        st.caption(snapshot_status["message"])
+                if recent_demand_rows:
+                    st.markdown("**Skills observed in the latest India snapshot**")
+                    st.bar_chart({row["Skill"]: row["Recent India listings"] for row in recent_demand_rows}, horizontal=True)
+                elif snapshot_status and snapshot_status["state"] == "available":
+                    st.info("No catalog skill was observed in the latest listing sample.")
+            elif snapshot_status:
+                st.info(snapshot_status["message"])
         else:
-            st.info("Skill-demand summaries are unavailable because the job catalog could not be loaded.")
+            st.info("Skill-demand summaries are unavailable because the job catalog could not be loaded or was malformed.")
 
     with progress_column:
         st.subheader("Saved learning progress")
@@ -156,10 +176,18 @@ def render_dashboard(demand_rows=None, demand_metadata=None, progress_summary=No
         elif progress_summary:
             st.metric("Saved learning plans", progress_summary["saved_plan_count"])
             st.metric("Completed step records", progress_summary["completed_step_count"])
+            if progress_summary.get("tracked_plan_count", 0):
+                st.metric("Plans completed", f"{progress_summary['fully_completed_plan_count']} / {progress_summary['tracked_plan_count']}")
+                st.progress(
+                    progress_summary["completion_ratio"],
+                    text=f"{progress_summary['completed_tracked_step_count']} of {progress_summary['tracked_step_count']} steps completed across plans with saved totals",
+                )
+                if progress_summary.get("untracked_plan_count", 0):
+                    st.caption(f"{progress_summary['untracked_plan_count']} older plan(s) do not have a saved step total yet; totals are added the next time progress is saved.")
             if progress_summary["last_updated"]:
                 st.caption(f"Last saved: {progress_summary['last_updated']} UTC")
             elif progress_summary["saved_plan_count"] == 0:
-                st.caption("Save progress from a personalized learning plan to see activity here.")
+                st.caption("No learning plans have been saved yet. Analyze a resume, then save progress from its learning plan to build this summary.")
             st.caption("Totals cover saved local profiles; a step saved in two plans is counted twice.")
         else:
             st.info("Saved learning progress is unavailable.")

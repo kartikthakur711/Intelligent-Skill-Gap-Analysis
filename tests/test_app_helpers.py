@@ -1,5 +1,6 @@
 import unittest
 import csv
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -8,6 +9,7 @@ from app_helpers import (
     build_learning_plan,
     build_learning_roadmap,
     build_skill_recommendations,
+    summarize_recent_snapshot,
 )
 
 
@@ -31,6 +33,35 @@ class LearningRoadmapTests(unittest.TestCase):
 
 
 class DashboardDataTests(unittest.TestCase):
+    def test_snapshot_zeros_are_explained_by_successful_but_limited_coverage(self):
+        status = summarize_recent_snapshot(
+            [{"category": "Data", "skill_normalized": "excel", "distinct_job_count": "3"}],
+            {"generated_at_utc": "2026-10-26T10:00:00Z", "api_records": "10", "processed_jobs": "9"},
+            now=datetime(2026, 10, 26, 11, tzinfo=timezone.utc),
+        )
+        self.assertEqual(status["state"], "available")
+        self.assertIn("10 API records", status["message"])
+        self.assertIn("zero for a skill", status["message"])
+
+    def test_snapshot_distinguishes_valid_empty_results_from_missing_data(self):
+        now = datetime(2026, 10, 26, tzinfo=timezone.utc)
+        empty = summarize_recent_snapshot(
+            [], {"generated_at_utc": "2026-10-25T23:00:00Z", "api_records": "0", "processed_jobs": "0"}, now=now
+        )
+        unavailable = summarize_recent_snapshot(None, None, now=now)
+        self.assertEqual(empty["state"], "no_listings")
+        self.assertIn("valid empty result", empty["message"])
+        self.assertEqual(unavailable["state"], "unavailable")
+
+    def test_snapshot_staleness_and_invalid_metadata_are_not_reported_as_zero(self):
+        stale = summarize_recent_snapshot(
+            [], {"generated_at_utc": "2026-10-20T00:00:00Z", "api_records": "0", "processed_jobs": "0"},
+            now=datetime(2026, 10, 26, tzinfo=timezone.utc),
+        )
+        malformed = summarize_recent_snapshot([], {"generated_at_utc": "not-a-date"})
+        self.assertEqual(stale["state"], "stale")
+        self.assertEqual(malformed["state"], "unavailable")
+
     def test_catalog_mentions_are_normalized_ranked_and_joined_to_recent_counts(self):
         rows = build_dashboard_skill_demand(
             [["Python", "SQL"], ["python", "Pandas"], ["SQL"]],

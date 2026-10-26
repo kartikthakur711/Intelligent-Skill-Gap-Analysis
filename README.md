@@ -125,7 +125,11 @@ The Streamlit application displays:
 - Personalized learning roadmap
 - Learning resources
 
-The dashboard counts skill mentions in the catalog, which can include repeated/template rows; they are not vacancy counts. Recent listing counts are shown separately with their snapshot generation time. Saved progress totals cover local profiles and count a completed step again when it appears in a separate plan. The progress format does not store each plan's full roadmap, so the dashboard does not infer completion percentages.
+The dashboard counts skill mentions in the catalog, which can include repeated/template rows; they are not vacancy counts. Recent listing counts are shown separately with their snapshot generation time. Saved progress totals cover local profiles and count a completed step again when it appears in a separate plan.
+
+Recent listing zeros are meaningful only when a valid CSV and metadata sidecar are present. The dashboard reports the snapshot's checked API records, usable descriptions, matched category/skill pairs, generation time, and freshness. A valid snapshot with no rows is distinguished from a missing or malformed snapshot; a zero for a particular skill means it was not found in the limited sample, not that no jobs require it. Snapshots older than 36 hours are marked stale. **Reload dashboard data** clears Streamlit's cached data and rereads the catalog and snapshot already on disk; it does not contact Headcount or run an import. The daily workflow remains the supported source of new listing snapshots.
+
+For plans saved after this update, progress records also store the roadmap step total, allowing the dashboard to show plan completion and a completion ratio based on persisted steps. Older records remain readable and their completed steps are preserved; they are marked as untracked until saved again with a step total. No completion percentage is inferred for those legacy records.
 
 ## Daily Data Pipeline
 
@@ -144,3 +148,5 @@ The app remains a prototype. Its compatibility score is trained against a progra
 After analyzing a resume, mark roadmap steps complete and select **Save progress**. Progress is stored in `data/learning_progress.json` by default. The file is excluded from Git. Set `LEARNING_PROGRESS_FILE` to use another writable local path. A normalized profile label is hashed before it is saved; the raw label and resume contents are not stored in the progress file. Profile labels only separate local records and do not provide authentication or access control. Use a nickname rather than an email address or other sensitive identifier.
 
 The JSON file is written atomically and malformed or unsupported files are left unchanged. This file-based option is suitable for local use or a single app process with durable disk. Many hosted Streamlit environments use ephemeral filesystems, and multiple replicas may have separate files; progress can disappear on restart or differ between replicas. Before deploying there, configure `LEARNING_PROGRESS_FILE` to a durable shared store or replace the file adapter with an authenticated database-backed store. Do not treat the default file as multi-user private storage.
+
+The dashboard source paths may be overridden with `SKILLSCOPE_JOB_CATALOG`, `SKILLSCOPE_DEMAND_CSV`, and `SKILLSCOPE_DEMAND_METADATA`. Keep these files available to every app instance. A manual dashboard reload only sees files mounted in the current instance; deploy the published daily snapshot or provide a shared durable mount to keep replicas consistent. The current file-backed progress store is also local to each instance unless configured on shared durable storage.

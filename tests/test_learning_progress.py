@@ -83,13 +83,44 @@ class LearningProgressTests(unittest.TestCase):
         summary = summarize_progress(self.path)
         self.assertEqual(summary["saved_plan_count"], 2)
         self.assertEqual(summary["completed_step_count"], 3)
+        self.assertEqual(summary["tracked_plan_count"], 2)
+        self.assertEqual(summary["tracked_step_count"], 6)
+        self.assertEqual(summary["completed_tracked_step_count"], 3)
+        self.assertEqual(summary["completion_ratio"], 0.5)
+        self.assertEqual(summary["fully_completed_plan_count"], 0)
         self.assertTrue(summary["last_updated"].endswith("+00:00"))
 
     def test_summary_of_missing_file_is_empty(self):
         self.assertEqual(
             summarize_progress(self.path),
-            {"saved_plan_count": 0, "completed_step_count": 0, "last_updated": None},
+            {
+                "saved_plan_count": 0,
+                "completed_step_count": 0,
+                "last_updated": None,
+                "tracked_plan_count": 0,
+                "untracked_plan_count": 0,
+                "fully_completed_plan_count": 0,
+                "tracked_step_count": 0,
+                "completed_tracked_step_count": 0,
+                "completion_ratio": 0.0,
+            },
         )
+
+    def test_legacy_plan_without_total_steps_remains_readable_and_untracked(self):
+        save_progress(self.path, "legacy", "Analyst", self.roadmap, ["Python"], normalize_skill)
+        data = json.loads(self.path.read_text(encoding="utf-8"))
+        record = next(iter(next(iter(data["profiles"].values()))["plans"].values()))
+        record.pop("total_steps")
+        self.path.write_text(json.dumps(data), encoding="utf-8")
+
+        summary = summarize_progress(self.path)
+        self.assertEqual(summary["saved_plan_count"], 1)
+        self.assertEqual(summary["completed_step_count"], 1)
+        self.assertEqual(summary["untracked_plan_count"], 1)
+        self.assertEqual(summary["tracked_plan_count"], 0)
+
+        save_progress(self.path, "legacy", "Analyst", self.roadmap, ["Python"], normalize_skill)
+        self.assertEqual(summarize_progress(self.path)["untracked_plan_count"], 0)
 
 
 if __name__ == "__main__":

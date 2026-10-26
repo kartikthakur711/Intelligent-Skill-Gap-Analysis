@@ -1,5 +1,7 @@
 """Shared application shell and the dashboard landing page."""
 
+import html
+
 import streamlit as st
 
 
@@ -57,6 +59,28 @@ def apply_app_styles():
         .step-copy { color:#71809a; font-size:13px; line-height:1.5; }
 [data-testid="stTextInput"] input, [data-testid="stSelectbox"] [role="combobox"] { border-radius:10px; }
 [data-testid="stDataFrame"] { border:1px solid #e9edf5; border-radius:12px; overflow:hidden; }
+        .analysis-kicker { color:#6578c9; text-transform:uppercase; letter-spacing:1.5px;
+          font-size:11px; font-weight:800; margin-bottom:8px; }
+        .analysis-title { color:#10182d; font-size:clamp(30px,4vw,42px); line-height:1.12;
+          letter-spacing:-1.5px; font-weight:780; margin:0 0 10px; }
+        .analysis-copy { color:#69758e; font-size:15px; line-height:1.65; max-width:700px; }
+        .analysis-step { display:flex; align-items:center; gap:10px; color:#68758e;
+          font-size:12px; font-weight:650; padding:7px 0 13px; }
+        .analysis-step span { width:25px; height:25px; border-radius:50%; display:grid; place-items:center;
+          background:#edf0ff; color:#536de8; font-size:11px; font-weight:800; }
+        [data-testid="stFileUploaderDropzone"] { border:1.5px dashed #b9c5e5; border-radius:14px;
+          background:#f8faff; }
+        [data-testid="stMetric"] { background:#fff; border:1px solid #e7ebf4; border-radius:15px;
+          padding:15px 17px; box-shadow:0 5px 18px rgba(25,42,82,.035); }
+        [data-testid="stMetricLabel"] { color:#69758e; font-weight:650; }
+        .skill-list { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 15px; }
+        .skill-chip { display:inline-flex; align-items:center; border-radius:999px; padding:7px 11px;
+          font-size:12px; line-height:1.2; font-weight:700; border:1px solid transparent; }
+        .skill-chip.match { color:#14734d; background:#e8f7ef; border-color:#caecd9; }
+        .skill-chip.gap { color:#9b4b25; background:#fff2e8; border-color:#f5d7c3; }
+        .match-callout { border-radius:16px; padding:18px 20px; margin:12px 0 18px;
+          background:linear-gradient(110deg,#eff3ff,#f8f5ff); border:1px solid #e1e7ff; }
+        .match-callout strong { color:#243b88; }
         [data-testid="stMainBlockContainer"] { padding-top:2rem; padding-bottom:3rem; }
         @media (max-width:700px) {
           [data-testid="stMainBlockContainer"] { padding-top:1.2rem; }
@@ -90,6 +114,18 @@ def render_sidebar():
         )
     return page
 
+
+
+def render_skill_chips(skills, tone="match"):
+    """Render safely escaped skill labels in compact, accessible chips."""
+    if not skills:
+        st.caption("No direct skill matches detected." if tone == "match" else "No missing skills detected.")
+        return
+    chips = "".join(
+        f'<span class="skill-chip {tone}">{html.escape(str(skill))}</span>'
+        for skill in skills
+    )
+    st.markdown(f'<div class="skill-list">{chips}</div>', unsafe_allow_html=True)
 
 def render_dashboard(demand_rows=None, demand_metadata=None, progress_summary=None, progress_error=None, snapshot_status=None, recent_demand_rows=None, role_rows=None, recent_title_rows=None, title_metadata=None, title_status=None):
     st.markdown('<div class="eyebrow">Career growth workspace</div>', unsafe_allow_html=True)

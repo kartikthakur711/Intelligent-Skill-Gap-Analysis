@@ -25,7 +25,7 @@ from app_helpers import (
     summarize_recent_snapshot,
 )
 from learning_progress import ProgressStoreError, load_progress, save_progress, summarize_progress
-from dashboard_ui import apply_app_styles, render_dashboard, render_sidebar
+from dashboard_ui import apply_app_styles, render_dashboard, render_sidebar, render_skill_chips
 from role_discovery import catalog_roles
 
 
@@ -454,28 +454,45 @@ if page == "Dashboard":
         dashboard_title_status,
     )
 else:
-    st.title("🎯 Intelligent Skill Gap Analysis & Personalized Learning")
-    st.write("Upload your resume and enter the target job title. The system retrieves the job, predicts compatibility, identifies skill gaps, and builds a learning roadmap.")
-
-    uploaded = st.file_uploader("Upload Resume", type=["pdf", "docx", "txt"])
+    st.markdown('<div class="analysis-kicker">Resume matching</div>', unsafe_allow_html=True)
+    st.markdown('<div class="analysis-title">See how your skills line up.</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="analysis-copy">Choose a role, add your resume, and get a clear view of your strengths and next learning steps.</div>',
+        unsafe_allow_html=True,
+    )
     try:
         available_roles = [role["Job title"] for role in catalog_roles(load_job_catalog())]
     except Exception:
         available_roles = []
-    selected_role = st.selectbox(
-        "Browse available catalog titles",
-        [""] + available_roles,
-        format_func=lambda value: "Choose a title or enter your own" if not value else value,
-        key="analysis_catalog_role",
-    )
-    job_title = st.text_input(
-        "Target Job Title",
-        value=selected_role,
-        placeholder="e.g., Data Scientist",
-        help="Use a catalog title for a direct match, or enter another title to try conservative matching.",
-    )
 
-    analyze = st.button("Analyze Resume", type="primary", use_container_width=True)
+    with st.container(border=True):
+        st.markdown('<div class="section-title">Start your analysis</div>', unsafe_allow_html=True)
+        st.caption("Your resume is analyzed in this session and is not saved with learning progress.")
+        upload_col, role_col = st.columns([1.05, 0.95], gap="large")
+        with upload_col:
+            st.markdown('<div class="analysis-step"><span>1</span> Add your resume</div>', unsafe_allow_html=True)
+            uploaded = st.file_uploader("Resume file", type=["pdf", "docx", "txt"], label_visibility="collapsed")
+            st.caption("PDF, Word, or text file · Text-based PDFs work best")
+            if uploaded is not None:
+                st.success(f"Resume ready · {uploaded.name}")
+        with role_col:
+            st.markdown('<div class="analysis-step"><span>2</span> Choose your target role</div>', unsafe_allow_html=True)
+            selected_role = st.selectbox(
+                "Browse available catalog titles",
+                [""] + available_roles,
+                format_func=lambda value: "Choose a title from the catalog" if not value else value,
+                key="analysis_catalog_role",
+                on_change=lambda: st.session_state.__setitem__("target_job_title", st.session_state["analysis_catalog_role"]),
+            )
+            if "target_job_title" not in st.session_state:
+                st.session_state["target_job_title"] = selected_role
+            job_title = st.text_input(
+                "Target Job Title",
+                placeholder="e.g., Data Scientist",
+                help="Choose a catalog title above or enter another role to try conservative matching.",
+                key="target_job_title",
+            )
+        analyze = st.button("Analyze my resume  →", type="primary", use_container_width=True)
 
     input_fingerprint = ""
     if uploaded is not None and job_title.strip():
@@ -610,23 +627,32 @@ else:
             )
             learning_plan = build_learning_plan(roadmap, normalize_skill)
 
-            st.success(f"Analysis completed for **{selected_job['job_title']}**")
+            st.markdown('<div class="analysis-kicker">Your results</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="analysis-title">Your match for {html.escape(str(selected_job["job_title"]))}</div>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                '<div class="match-callout"><strong>A starting point for your next move.</strong> '
+                'Use this estimate alongside your experience and goals; it is not a hiring decision.</div>',
+                unsafe_allow_html=True,
+            )
+            c1, c2, c3 = st.columns(3, gap="medium")
+            c1.metric("Compatibility estimate", f"{compatibility:.1f}%")
+            c2.metric("Skills matched", f"{len(matched)} of {len(job_skills)}")
+            c3.metric("Skills to build", len(missing))
+            st.progress(compatibility / 100, text="Prototype estimate · not a hiring probability")
 
-            c1, c2, c3 = st.columns(3)
-            c1.metric("ML Compatibility", f"{compatibility:.1f}%")
-            st.caption("Prototype estimate trained on constructed compatibility scores; it is not a hiring probability or prediction of interview success.")
-            c2.metric("Matched Skills", f"{len(matched)} / {len(job_skills)}")
-            c3.metric("Missing Skills", len(missing))
+            match_col, gap_col = st.columns(2, gap="large")
+            with match_col:
+                st.markdown('<div class="section-title">Your strengths</div>', unsafe_allow_html=True)
+                render_skill_chips(matched, "match")
+            with gap_col:
+                st.markdown('<div class="section-title">Growth opportunities</div>', unsafe_allow_html=True)
+                render_skill_chips(missing, "gap")
 
-            st.subheader("Job Selected")
-            st.write(selected_job["job_title"])
-            st.caption(clean_job_description(selected_job["job_description"]))
-
-            st.subheader("Matched Skills")
-            st.write(", ".join(matched) if matched else "No direct skill matches detected.")
-
-            st.subheader("Missing Skills")
-            st.write(", ".join(missing) if missing else "No missing skills detected.")
+            with st.expander(f"About this {selected_job['job_title']} role"):
+                st.caption(clean_job_description(selected_job["job_description"]))
 
             if not priority_df.empty:
                 st.subheader("Prioritized Skill Gap")
@@ -646,12 +672,12 @@ else:
             st.caption("Prerequisites come first. Missing skills are ranked using catalog frequency, with recent India listing counts as a modest supplementary signal. The 30/60/90-day groups are suggested pacing, not fixed course durations.")
             if roadmap:
                 for phase in learning_plan:
-                    st.markdown(f"**{phase['Phase']}**")
-                    if phase["Skills"]:
-                        for skill in phase["Skills"]:
-                            st.write(f"- {skill.title()}")
-                    else:
-                        st.caption("Consolidate earlier skills and practice with a small project.")
+                    with st.container(border=True):
+                        st.markdown(f"**{phase['Phase']}**")
+                        if phase["Skills"]:
+                            st.markdown("  ·  ".join(skill.title() for skill in phase["Skills"]))
+                        else:
+                            st.caption("Consolidate earlier skills and practice with a small project.")
             else:
                 st.write("No additional learning steps are required from the detected job skills.")
 

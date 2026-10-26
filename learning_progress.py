@@ -61,6 +61,11 @@ def _validate_store(data):
                 or not isinstance(record.get("completed_skills"), list)
                 or not all(isinstance(skill, str) for skill in record["completed_skills"])
                 or not isinstance(record.get("updated_at"), str)
+                or ("total_steps" in record and (
+                    not isinstance(record["total_steps"], int)
+                    or isinstance(record["total_steps"], bool)
+                    or record["total_steps"] < len(record["completed_skills"])
+                ))
             ):
                 raise ProgressStoreError("Progress file is invalid; it was left unchanged.")
     return data
@@ -99,10 +104,22 @@ def summarize_progress(path):
         for record in profile["plans"].values()
     ]
     timestamps = [record["updated_at"] for record in records if record["updated_at"]]
+    tracked = [record for record in records if isinstance(record.get("total_steps"), int)]
+    tracked_total = sum(record["total_steps"] for record in tracked)
+    tracked_completed = sum(len(record["completed_skills"]) for record in tracked)
     return {
         "saved_plan_count": len(records),
         "completed_step_count": sum(len(record["completed_skills"]) for record in records),
         "last_updated": max(timestamps, default=None),
+        "tracked_plan_count": len(tracked),
+        "untracked_plan_count": len(records) - len(tracked),
+        "fully_completed_plan_count": sum(
+            record["total_steps"] > 0 and len(record["completed_skills"]) == record["total_steps"]
+            for record in tracked
+        ),
+        "tracked_step_count": tracked_total,
+        "completed_tracked_step_count": tracked_completed,
+        "completion_ratio": tracked_completed / tracked_total if tracked_total else 0.0,
     }
 
 
@@ -117,6 +134,7 @@ def save_progress(path, profile, job_title, roadmap, completed_skills, normalize
     profile_record = store["profiles"].setdefault(profile_id, {"plans": {}})
     profile_record["plans"][plan_id] = {
         "completed_skills": completed,
+        "total_steps": len(roadmap),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     temporary_path = None

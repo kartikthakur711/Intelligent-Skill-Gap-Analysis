@@ -21,6 +21,7 @@ from app_helpers import (
     build_learning_roadmap,
     build_skill_recommendations,
     clean_html,
+    summarize_recent_snapshot,
 )
 from learning_progress import ProgressStoreError, load_progress, save_progress, summarize_progress
 from dashboard_ui import apply_app_styles, render_dashboard, render_sidebar
@@ -28,10 +29,10 @@ from dashboard_ui import apply_app_styles, render_dashboard, render_sidebar
 
 APP_DIR = Path(__file__).resolve().parent
 MODEL_FILE = APP_DIR / "resume_job_ml_model.pkl"
-JOB_FILE = APP_DIR / "job_catalog.csv"
+JOB_FILE = Path(os.environ.get("SKILLSCOPE_JOB_CATALOG", APP_DIR / "job_catalog.csv"))
 RESOURCE_FILE = APP_DIR / "learning_resources.csv"
-HEADCOUNT_DEMAND_FILE = APP_DIR / "data_pipeline" / "headcount_skill_demand.csv"
-HEADCOUNT_METADATA_FILE = APP_DIR / "data_pipeline" / "headcount_skill_demand.metadata.json"
+HEADCOUNT_DEMAND_FILE = Path(os.environ.get("SKILLSCOPE_DEMAND_CSV", APP_DIR / "data_pipeline" / "headcount_skill_demand.csv"))
+HEADCOUNT_METADATA_FILE = Path(os.environ.get("SKILLSCOPE_DEMAND_METADATA", APP_DIR / "data_pipeline" / "headcount_skill_demand.metadata.json"))
 LEARNING_PROGRESS_FILE = Path(
     os.environ.get("LEARNING_PROGRESS_FILE", APP_DIR / "data" / "learning_progress.json")
 )
@@ -384,17 +385,37 @@ page = render_sidebar()
 if page == "Dashboard":
     dashboard_demand = []
     dashboard_demand_metadata = None
+    dashboard_snapshot_status = summarize_recent_snapshot(None, None)
+    dashboard_recent_counts = None
+    dashboard_recent_demand = []
     try:
         dashboard_catalog = load_job_catalog()
-        dashboard_headcount_rows, dashboard_demand_metadata = load_headcount_demand()
-        dashboard_recent_counts = recent_skill_counts(dashboard_headcount_rows)
         dashboard_demand = build_dashboard_skill_demand(
-            dashboard_catalog["skills_list"].tolist(), dashboard_recent_counts, normalize_skill
+            dashboard_catalog["skills_list"].tolist(), None, normalize_skill
         )
     except Exception:
         # Keep the landing page available if an optional data source is unavailable.
         dashboard_demand = []
-        dashboard_demand_metadata = None
+    try:
+        dashboard_headcount_rows, dashboard_demand_metadata = load_headcount_demand()
+        dashboard_recent_counts = recent_skill_counts(dashboard_headcount_rows)
+        dashboard_snapshot_status = summarize_recent_snapshot(dashboard_headcount_rows, dashboard_demand_metadata)
+        all_dashboard_demand = build_dashboard_skill_demand(
+            dashboard_catalog["skills_list"].tolist(), dashboard_recent_counts, normalize_skill, limit=1000
+        )
+        dashboard_demand = all_dashboard_demand[:5]
+        dashboard_recent_demand = sorted(
+            (row for row in all_dashboard_demand if row.get("Recent India listings", 0) > 0),
+            key=lambda row: (-row["Recent India listings"], normalize_skill(row["Skill"])),
+        )[:5]
+    except Exception:
+        # Keep catalog summaries available if only the optional snapshot is unavailable.
+        dashboard_snapshot_status = summarize_recent_snapshot(None, None)
+        dashboard_recent_demand = []
+        if dashboard_demand:
+            dashboard_demand = build_dashboard_skill_demand(
+                dashboard_catalog["skills_list"].tolist(), None, normalize_skill
+            )
     dashboard_progress = None
     dashboard_progress_error = ""
     try:
@@ -406,6 +427,8 @@ if page == "Dashboard":
         dashboard_demand_metadata,
         dashboard_progress,
         dashboard_progress_error,
+        dashboard_snapshot_status,
+        dashboard_recent_demand,
     )
 else:
     st.title("🎯 Intelligent Skill Gap Analysis & Personalized Learning")

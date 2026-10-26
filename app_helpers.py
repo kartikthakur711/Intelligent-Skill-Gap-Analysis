@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import html
 import re
+from datetime import datetime, timezone
 
 
 def clean_html(text: object) -> str:
@@ -113,3 +114,45 @@ def build_dashboard_skill_demand(catalog_skill_rows, recent_counts, normalize_sk
         rows.append(row)
     rows.sort(key=lambda row: (-row["Catalog mentions"], normalize_skill(row["Skill"])))
     return rows[:max(0, int(limit))]
+
+
+def summarize_recent_snapshot(rows, metadata, now=None, stale_after_hours=36):
+    """Explain whether an aggregate snapshot is current, empty, or unavailable."""
+    if rows is None or metadata is None:
+        return {
+            "state": "unavailable",
+            "message": "Recent India listing data is unavailable (missing or invalid snapshot files). Catalog mentions remain available.",
+            "age_hours": None,
+        }
+
+    try:
+        generated = datetime.fromisoformat(str(metadata["generated_at_utc"]).replace("Z", "+00:00"))
+        if generated.tzinfo is None:
+            generated = generated.replace(tzinfo=timezone.utc)
+        generated = generated.astimezone(timezone.utc)
+        current = now or datetime.now(timezone.utc)
+        if current.tzinfo is None:
+            current = current.replace(tzinfo=timezone.utc)
+        age_hours = max(0.0, (current.astimezone(timezone.utc) - generated).total_seconds() / 3600)
+        api_records = int(metadata["api_records"])
+        processed_jobs = int(metadata["processed_jobs"])
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return {
+            "state": "unavailable",
+            "message": "Recent India listing data has invalid freshness or coverage metadata. Catalog mentions remain available.",
+            "age_hours": None,
+        }
+
+    if age_hours >= stale_after_hours:
+        state = "stale"
+        message = f"Snapshot is {age_hours:.0f} hours old, beyond the {stale_after_hours}-hour freshness window. Its recorded counts are shown as historical context."
+    elif api_records == 0:
+        state = "no_listings"
+        message = "The latest snapshot found no India listings in its 48-hour posting window. This is a valid empty result, not a missing-data error."
+    elif not rows:
+        state = "no_skill_matches"
+        message = f"The snapshot checked {api_records} API records ({processed_jobs} usable descriptions) but found no matches for catalog skills. This is a valid empty result, not a missing-data error."
+    else:
+        state = "available"
+        message = f"The snapshot checked {api_records} API records ({processed_jobs} usable descriptions) and matched {len(rows)} category/skill pairs. A zero for a skill means it was not matched in this limited sample."
+    return {"state": state, "message": message, "age_hours": age_hours}

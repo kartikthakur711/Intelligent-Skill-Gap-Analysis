@@ -5,6 +5,7 @@ import csv
 import json
 from pathlib import Path
 from typing import Callable
+from datetime import datetime
 
 REQUIRED_COLUMNS = {
     "category",
@@ -28,6 +29,14 @@ def load_headcount_demand(
         required_metadata = {"generated_at_utc", "window_start_utc", "api_records", "processed_jobs", "category_skill_pairs"}
         if not isinstance(metadata, dict) or not required_metadata.issubset(metadata):
             return None, None
+        for name in ("generated_at_utc", "window_start_utc"):
+            value = str(metadata[name]).replace("Z", "+00:00")
+            parsed = datetime.fromisoformat(value)
+            if parsed.tzinfo is None:
+                return None, None
+        for name in ("api_records", "processed_jobs", "category_skill_pairs"):
+            if int(metadata[name]) < 0:
+                return None, None
         with path.open("r", encoding="utf-8-sig", newline="") as handle:
             reader = csv.DictReader(handle)
             if not REQUIRED_COLUMNS.issubset(reader.fieldnames or []):
@@ -36,17 +45,22 @@ def load_headcount_demand(
             for row in reader:
                 skill = normalize_skill(row.get("skill", ""))
                 try:
-                    count = max(0, int(float(row.get("distinct_job_count", "0"))))
+                    raw_count = row.get("distinct_job_count", "")
+                    count = int(raw_count)
                 except (TypeError, ValueError):
-                    continue
-                if skill and row.get("category"):
-                    rows.append({
-                        "category": row["category"],
-                        "skill_normalized": skill,
-                        "distinct_job_count": str(count),
-                    })
+                    return None, None
+                category = str(row.get("category", "")).strip()
+                if count < 0 or not skill or not category:
+                    return None, None
+                rows.append({
+                    "category": category,
+                    "skill_normalized": skill,
+                    "distinct_job_count": str(count),
+                })
+            if len(rows) != int(metadata["category_skill_pairs"]):
+                return None, None
             return rows, {str(k): str(v) for k, v in metadata.items()}
-    except (OSError, csv.Error, UnicodeError, json.JSONDecodeError):
+    except (OSError, csv.Error, UnicodeError, json.JSONDecodeError, TypeError, ValueError, OverflowError):
         return None, None
 
 

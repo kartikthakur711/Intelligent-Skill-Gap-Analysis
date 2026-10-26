@@ -46,7 +46,13 @@ class AppRuntimeTests(unittest.TestCase):
         self.assertEqual(len(app.file_uploader), 1)
         self.assertTrue(any(item.label == "Browse available catalog titles" for item in app.selectbox))
         self.assertTrue(any(item.label == "Target Job Title" for item in app.text_input))
-        self.assertTrue(any(button.label == "Analyze Resume" for button in app.button))
+        role_picker = next(item for item in app.selectbox if item.label == "Browse available catalog titles")
+        app = role_picker.select("Data Scientist").run()
+        self.assertEqual(next(item for item in app.text_input if item.label == "Target Job Title").value, "Data Scientist")
+        self.assertTrue(any("Start your analysis" in item.value for item in app.markdown))
+        self.assertTrue(any("Add your resume" in item.value for item in app.markdown))
+        self.assertTrue(any("Choose your target role" in item.value for item in app.markdown))
+        self.assertTrue(any("Analyze my resume" in button.label for button in app.button))
 
     def test_dashboard_data_present_empty_missing_and_malformed_sources(self):
         app_path = Path(__file__).resolve().parents[1] / "app.py"

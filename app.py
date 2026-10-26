@@ -632,16 +632,24 @@ else:
                 f'<div class="analysis-title">Your match for {html.escape(str(selected_job["job_title"]))}</div>',
                 unsafe_allow_html=True,
             )
-            st.markdown(
-                '<div class="match-callout"><strong>A starting point for your next move.</strong> '
-                'Use this estimate alongside your experience and goals; it is not a hiring decision.</div>',
-                unsafe_allow_html=True,
-            )
-            c1, c2, c3 = st.columns(3, gap="medium")
-            c1.metric("Compatibility estimate", f"{compatibility:.1f}%")
-            c2.metric("Skills matched", f"{len(matched)} of {len(job_skills)}")
-            c3.metric("Skills to build", len(missing))
-            st.progress(compatibility / 100, text="Prototype estimate · not a hiring probability")
+            score_col, signals_col = st.columns([0.85, 1.45], gap="large")
+            with score_col:
+                st.markdown(
+                    f'<div class="score-card"><div class="score-ring" style="--score:{compatibility:.1f}%">'
+                    f'<div class="score-ring-copy"><span class="score-ring-value">{compatibility:.1f}%</span>'
+                    '<span class="score-ring-label">PROTOTYPE ESTIMATE</span></div></div>'
+                    '<div><div class="score-title">Compatibility estimate</div>'
+                    '<div class="score-description">A model-generated comparison of your resume and this role. '
+                    'It is not a hiring probability or a prediction of interview success.</div></div></div>',
+                    unsafe_allow_html=True,
+                )
+            with signals_col:
+                st.markdown('<div class="section-title">Model input signals</div>', unsafe_allow_html=True)
+                signal_col1, signal_col2, signal_col3 = st.columns(3, gap="small")
+                signal_col1.metric("Skill coverage", f"{overlap_ratio * 100:.1f}%", help=f"{len(matched)} of {len(job_skills)} catalog skills matched")
+                signal_col2.metric("Keyword similarity", f"{tfidf_sim * 100:.1f}%", help="TF-IDF text similarity between the resume and selected role description")
+                signal_col3.metric("Semantic similarity", f"{semantic_sim * 100:.1f}%", help="Normalized sentence-embedding similarity between the resume and role description")
+                st.caption("These are descriptive model inputs, not separate odds or causal contributions to the overall estimate.")
 
             match_col, gap_col = st.columns(2, gap="large")
             with match_col:

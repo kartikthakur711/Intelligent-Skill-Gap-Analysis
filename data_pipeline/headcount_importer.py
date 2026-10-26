@@ -29,6 +29,7 @@ API_BASE = "https://api.headcountlabs.com"
 FIELDS = "job_id,title,description"
 APP_COLUMNS = ("job_id", "category", "job_title", "job_description", "job_skill_set")
 OUTPUT_COLUMNS = ("category", "skill", "distinct_job_count", "window_start_utc", "generated_at_utc")
+TITLE_COLUMNS = ("job_title", "distinct_job_count", "window_start_utc", "generated_at_utc")
 REQUEST_TIMEOUT_SECONDS = 20
 MAX_REQUEST_ATTEMPTS = 4
 RETRY_BASE_SECONDS = 1.0
@@ -165,6 +166,8 @@ def run(
         "limit": str(min(page_size, max_records)),
     }
     jobs: dict[str, tuple[str, str]] = {}
+    sourced_titles: dict[str, str] = {}
+    title_job_ids: dict[str, set[str]] = defaultdict(set)
     seen_job_ids: set[str] = set()
     cursor: str | None = None
     watermark: str | None = None
@@ -181,11 +184,17 @@ def run(
             job_id = str(job.get("job_id") or "").strip()
             if not job_id:
                 raise RuntimeError("Headcount returned a job without job_id; refusing an uncountable import")
+            if job_id in seen_job_ids:
+                continue
             seen_job_ids.add(job_id)
             if len(seen_job_ids) > max_records:
                 raise RuntimeError(f"Import exceeded the safety cap of {max_records} unique API records")
             title = field_value(job.get("title"))
             description = field_value(job.get("description"))
+            if title:
+                title_key = re.sub(r"\s+", " ", title).strip().casefold()
+                sourced_titles.setdefault(title_key, re.sub(r"\s+", " ", title).strip())
+                title_job_ids[title_key].add(job_id)
             if not title or not description:
                 continue
             jobs[job_id] = (title, description)
@@ -215,7 +224,20 @@ def run(
                 "generated_at_utc": generated_at,
             })
     temporary_path.replace(output_path)
-    metadata = {"generated_at_utc": generated_at, "window_start_utc": posted_since, "snapshot_watermark": watermark or "", "api_records": len(seen_job_ids), "processed_jobs": len(jobs), "category_skill_pairs": len(counts), "max_records": max_records}
+    titles_path = output_path.with_name("headcount_job_titles.csv")
+    titles_temporary_path = titles_path.with_suffix(titles_path.suffix + ".tmp")
+    with titles_temporary_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=TITLE_COLUMNS)
+        writer.writeheader()
+        for title_key, title in sorted(sourced_titles.items()):
+            writer.writerow({
+                "job_title": title,
+                "distinct_job_count": len(title_job_ids[title_key]),
+                "window_start_utc": posted_since,
+                "generated_at_utc": generated_at,
+            })
+    titles_temporary_path.replace(titles_path)
+    metadata = {"generated_at_utc": generated_at, "window_start_utc": posted_since, "snapshot_watermark": watermark or "", "api_records": len(seen_job_ids), "processed_jobs": len(jobs), "category_skill_pairs": len(counts), "distinct_title_count": len(sourced_titles), "max_records": max_records}
     metadata_path = output_path.with_suffix(".metadata.json")
     metadata_temporary_path = metadata_path.with_suffix(metadata_path.suffix + ".tmp")
     with metadata_temporary_path.open("w", encoding="utf-8") as handle:

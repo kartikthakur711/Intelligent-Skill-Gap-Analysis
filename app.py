@@ -14,6 +14,7 @@ import streamlit as st
 from sklearn.metrics.pairwise import cosine_similarity
 
 from data_pipeline.skill_demand import load_headcount_demand as read_headcount_demand
+from data_pipeline.skill_demand import load_headcount_titles as read_headcount_titles
 from data_pipeline.skill_demand import recent_skill_counts
 from app_helpers import (
     build_dashboard_skill_demand,
@@ -25,6 +26,7 @@ from app_helpers import (
 )
 from learning_progress import ProgressStoreError, load_progress, save_progress, summarize_progress
 from dashboard_ui import apply_app_styles, render_dashboard, render_sidebar
+from role_discovery import catalog_roles
 
 
 APP_DIR = Path(__file__).resolve().parent
@@ -33,6 +35,7 @@ JOB_FILE = Path(os.environ.get("SKILLSCOPE_JOB_CATALOG", APP_DIR / "job_catalog.
 RESOURCE_FILE = APP_DIR / "learning_resources.csv"
 HEADCOUNT_DEMAND_FILE = Path(os.environ.get("SKILLSCOPE_DEMAND_CSV", APP_DIR / "data_pipeline" / "headcount_skill_demand.csv"))
 HEADCOUNT_METADATA_FILE = Path(os.environ.get("SKILLSCOPE_DEMAND_METADATA", APP_DIR / "data_pipeline" / "headcount_skill_demand.metadata.json"))
+HEADCOUNT_TITLES_FILE = Path(os.environ.get("SKILLSCOPE_TITLES_CSV", APP_DIR / "data_pipeline" / "headcount_job_titles.csv"))
 LEARNING_PROGRESS_FILE = Path(
     os.environ.get("LEARNING_PROGRESS_FILE", APP_DIR / "data" / "learning_progress.json")
 )
@@ -218,6 +221,11 @@ def load_headcount_demand():
     """Load derived counts only; source postings are never read by the app."""
     return read_headcount_demand(HEADCOUNT_DEMAND_FILE, normalize_skill, HEADCOUNT_METADATA_FILE)
 
+
+def load_headcount_titles():
+    """Load only a validated title aggregate and the shared listing metadata."""
+    return read_headcount_titles(HEADCOUNT_TITLES_FILE, HEADCOUNT_METADATA_FILE)
+
 def extract_resume_skills(resume_text, skill_vocabulary):
     text = resume_text.lower()
     found = []
@@ -383,6 +391,10 @@ def priority_from_demand(missing_skills, catalog, recent_counts=None):
 # -----------------------------
 page = render_sidebar()
 if page == "Dashboard":
+    dashboard_roles = []
+    dashboard_recent_titles = None
+    dashboard_title_metadata = None
+    dashboard_title_status = summarize_recent_snapshot(None, None)
     dashboard_demand = []
     dashboard_demand_metadata = None
     dashboard_snapshot_status = summarize_recent_snapshot(None, None)
@@ -390,6 +402,7 @@ if page == "Dashboard":
     dashboard_recent_demand = []
     try:
         dashboard_catalog = load_job_catalog()
+        dashboard_roles = catalog_roles(dashboard_catalog)
         dashboard_demand = build_dashboard_skill_demand(
             dashboard_catalog["skills_list"].tolist(), None, normalize_skill
         )
@@ -416,6 +429,12 @@ if page == "Dashboard":
             dashboard_demand = build_dashboard_skill_demand(
                 dashboard_catalog["skills_list"].tolist(), None, normalize_skill
             )
+    try:
+        dashboard_recent_titles, dashboard_title_metadata = load_headcount_titles()
+        dashboard_title_status = summarize_recent_snapshot(dashboard_recent_titles, dashboard_title_metadata)
+    except Exception:
+        dashboard_recent_titles, dashboard_title_metadata = None, None
+        dashboard_title_status = summarize_recent_snapshot(None, None)
     dashboard_progress = None
     dashboard_progress_error = ""
     try:
@@ -429,13 +448,32 @@ if page == "Dashboard":
         dashboard_progress_error,
         dashboard_snapshot_status,
         dashboard_recent_demand,
+        dashboard_roles,
+        dashboard_recent_titles,
+        dashboard_title_metadata,
+        dashboard_title_status,
     )
 else:
     st.title("🎯 Intelligent Skill Gap Analysis & Personalized Learning")
     st.write("Upload your resume and enter the target job title. The system retrieves the job, predicts compatibility, identifies skill gaps, and builds a learning roadmap.")
 
     uploaded = st.file_uploader("Upload Resume", type=["pdf", "docx", "txt"])
-    job_title = st.text_input("Target Job Title", placeholder="e.g., Data Scientist")
+    try:
+        available_roles = [role["Job title"] for role in catalog_roles(load_job_catalog())]
+    except Exception:
+        available_roles = []
+    selected_role = st.selectbox(
+        "Browse available catalog titles",
+        [""] + available_roles,
+        format_func=lambda value: "Choose a title or enter your own" if not value else value,
+        key="analysis_catalog_role",
+    )
+    job_title = st.text_input(
+        "Target Job Title",
+        value=selected_role,
+        placeholder="e.g., Data Scientist",
+        help="Use a catalog title for a direct match, or enter another title to try conservative matching.",
+    )
 
     analyze = st.button("Analyze Resume", type="primary", use_container_width=True)
 

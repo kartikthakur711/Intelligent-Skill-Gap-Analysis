@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import headcount_importer as importer
-from data_pipeline.skill_demand import load_headcount_demand, recent_skill_counts
+from data_pipeline.skill_demand import load_headcount_demand, load_headcount_titles, recent_skill_counts
 
 
 class HeadcountImporterTests(unittest.TestCase):
@@ -51,10 +51,25 @@ class HeadcountImporterTests(unittest.TestCase):
         self.assertIn(",1", content)
         self.assertIn("window_start_utc", content)
         self.assertIn("generated_at_utc", content)
+        title_path = self.output.with_name("headcount_job_titles.csv")
+        with title_path.open(encoding="utf-8", newline="") as handle:
+            titles = list(csv.DictReader(handle))
+        self.assertEqual(titles, [{
+            "job_title": "ML Engineer",
+            "distinct_job_count": "1",
+            "window_start_utc": "2026-10-22T00:00:00Z",
+            "generated_at_utc": json.loads(self.output.with_suffix(".metadata.json").read_text(encoding="utf-8"))["generated_at_utc"],
+        }])
+        self.assertNotIn("private source text", title_path.read_text(encoding="utf-8"))
+        self.assertNotIn("Python and Scikit-Learn", title_path.read_text(encoding="utf-8"))
         metadata = json.loads(self.output.with_suffix(".metadata.json").read_text(encoding="utf-8"))
         self.assertEqual(metadata["api_records"], 1)
         self.assertEqual(metadata["processed_jobs"], 1)
+        self.assertEqual(metadata["distinct_title_count"], 1)
         self.assertNotIn("private source text", json.dumps(metadata))
+        loaded_titles, title_metadata = load_headcount_titles(title_path, self.output.with_suffix(".metadata.json"))
+        self.assertEqual(loaded_titles[0]["job_title"], "ML Engineer")
+        self.assertEqual(title_metadata["distinct_title_count"], "1")
 
     def test_fails_when_cap_would_truncate_a_page_walk(self):
         page = {"data": [{"job_id": str(n), "title": "Engineer", "description": "Python"} for n in range(2)], "next_cursor": "opaque", "snapshot_watermark": "w"}
@@ -69,6 +84,41 @@ class HeadcountImporterTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "safety cap"):
                 importer.run(self.catalog, self.output, api_key="unused-test-token", posted_since="2026-10-22T00:00:00Z", max_records=1)
         self.assertFalse(self.output.exists())
+
+    def test_keeps_real_titles_with_missing_descriptions_as_title_only_aggregates(self):
+        page = {"data": [
+            {"job_id": "one", "title": "Data Analyst", "description": ""},
+            {"job_id": "two", "title": " Data   Analyst ", "description": {"state": "unknown"}},
+        ], "next_cursor": None, "snapshot_watermark": "w"}
+        with patch.object(importer, "request_page", return_value=page):
+            result = importer.run(self.catalog, self.output, api_key="unused-test-token", posted_since="2026-10-22T00:00:00Z")
+        self.assertEqual(result["unique_jobs"], 2)
+        self.assertEqual(result["processed_jobs"], 0)
+        with self.output.with_name("headcount_job_titles.csv").open(encoding="utf-8", newline="") as handle:
+            titles = list(csv.DictReader(handle))
+        self.assertEqual(len(titles), 1)
+        self.assertEqual(titles[0]["job_title"], "Data Analyst")
+        self.assertEqual(titles[0]["distinct_job_count"], "2")
+        self.assertFalse(self.output.with_name("headcount_job_titles.csv").with_suffix(".metadata.json").exists())
+
+    def test_title_reader_distinguishes_missing_empty_and_malformed_snapshots(self):
+        title_path = self.output.with_name("headcount_job_titles.csv")
+        metadata_path = self.output.with_suffix(".metadata.json")
+        self.assertEqual(load_headcount_titles(title_path, metadata_path), (None, None))
+        metadata_path.parent.mkdir(parents=True, exist_ok=True)
+        metadata_path.write_text(json.dumps({
+            "generated_at_utc": "2026-10-24T00:00:00Z",
+            "window_start_utc": "2026-10-22T00:00:00Z",
+            "api_records": 0,
+            "processed_jobs": 0,
+            "distinct_title_count": 0,
+        }), encoding="utf-8")
+        title_path.write_text(",".join(importer.TITLE_COLUMNS) + "\n", encoding="utf-8")
+        rows, metadata = load_headcount_titles(title_path, metadata_path)
+        self.assertEqual(rows, [])
+        self.assertEqual(metadata["api_records"], "0")
+        title_path.write_text(",".join(importer.TITLE_COLUMNS) + "\nEngineer,invalid,2026-10-22T00:00:00Z,2026-10-24T00:00:00Z\n", encoding="utf-8")
+        self.assertEqual(load_headcount_titles(title_path, metadata_path), (None, None))
 
     def test_reader_keeps_metadata_for_header_only_aggregate(self):
         self.output.parent.mkdir(parents=True, exist_ok=True)

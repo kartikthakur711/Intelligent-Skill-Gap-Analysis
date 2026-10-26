@@ -91,6 +91,11 @@ class DashboardDataTests(unittest.TestCase):
         )
         self.assertEqual(roadmap.count("python"), 1)
 
+    def test_circular_prerequisites_do_not_recurse_forever(self):
+        dependencies = {"skill a": ["skill b"], "skill b": ["skill a"]}
+        roadmap = build_learning_roadmap(["skill a"], dependencies, [], normalize_skill)
+        self.assertEqual(roadmap, ["skill b", "skill a"])
+
     def test_empty_gap_returns_empty_roadmap(self):
         self.assertEqual(
             build_learning_roadmap([], {}, ["python"], normalize_skill), []
@@ -152,3 +157,4 @@ class RecommendationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -698,7 +698,7 @@ else:
                                 help="Skill occurrences divided by the most frequent skill in the loaded catalog.",
                                 min_value=0,
                                 max_value=1,
-                                format="%.0%%",
+                                format="%.0f%%",
                             )
                         },
                     )

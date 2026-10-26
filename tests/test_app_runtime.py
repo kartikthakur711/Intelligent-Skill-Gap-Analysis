@@ -28,7 +28,15 @@ class AppRuntimeTests(unittest.TestCase):
         )
         self.assertTrue(any("Skills appearing in the job catalog" in item.value for item in app.subheader))
         self.assertTrue(any("Recently observed provider titles" in item.value for item in app.markdown))
-        self.assertTrue(any("does not contain a validated title aggregate yet" in item.value for item in app.info))
+        title_status_text = "\n".join(
+            item.value for item in (*app.info, *app.caption, *app.warning)
+        )
+        self.assertTrue(any(message in title_status_text for message in (
+            "does not contain a validated title aggregate yet",
+            "distinct titles from the limited India posting sample",
+            "latest provider run found no records",
+            "none had a usable job title",
+        )))
         self.assertTrue(any("Saved learning progress" in item.value for item in app.subheader))
         self.assertTrue(any("Saved learning plans" in metric.label for metric in app.metric))
         self.assertTrue(any("Distinct catalog titles" == metric.label and metric.value == "12" for metric in app.metric))
@@ -46,7 +54,13 @@ class AppRuntimeTests(unittest.TestCase):
         self.assertEqual(len(app.file_uploader), 1)
         self.assertTrue(any(item.label == "Browse available catalog titles" for item in app.selectbox))
         self.assertTrue(any(item.label == "Target Job Title" for item in app.text_input))
-        self.assertTrue(any(button.label == "Analyze Resume" for button in app.button))
+        role_picker = next(item for item in app.selectbox if item.label == "Browse available catalog titles")
+        app = role_picker.select("Data Scientist").run()
+        self.assertEqual(next(item for item in app.text_input if item.label == "Target Job Title").value, "Data Scientist")
+        self.assertTrue(any("Start your analysis" in item.value for item in app.markdown))
+        self.assertTrue(any("Add your resume" in item.value for item in app.markdown))
+        self.assertTrue(any("Choose your target role" in item.value for item in app.markdown))
+        self.assertTrue(any("Analyze my resume" in button.label for button in app.button))
 
     def test_dashboard_data_present_empty_missing_and_malformed_sources(self):
         app_path = Path(__file__).resolve().parents[1] / "app.py"

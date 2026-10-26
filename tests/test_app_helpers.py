@@ -4,6 +4,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from app_helpers import (
+    build_dashboard_skill_demand,
     build_learning_plan,
     build_learning_roadmap,
     build_skill_recommendations,
@@ -27,6 +28,30 @@ class LearningRoadmapTests(unittest.TestCase):
         self.assertEqual(roadmap, ["data analysis", "power bi"])
         self.assertNotIn("python", roadmap)
         self.assertNotIn("pandas", roadmap)
+
+
+class DashboardDataTests(unittest.TestCase):
+    def test_catalog_mentions_are_normalized_ranked_and_joined_to_recent_counts(self):
+        rows = build_dashboard_skill_demand(
+            [["Python", "SQL"], ["python", "Pandas"], ["SQL"]],
+            {"python": 4, "sql": 1},
+            normalize_skill,
+        )
+        self.assertEqual(
+            rows,
+            [
+                {"Skill": "Python", "Catalog mentions": 2, "Recent India listings": 4},
+                {"Skill": "SQL", "Catalog mentions": 2, "Recent India listings": 1},
+                {"Skill": "Pandas", "Catalog mentions": 1, "Recent India listings": 0},
+            ],
+        )
+
+    def test_dashboard_demand_does_not_invent_rows_for_an_empty_catalog(self):
+        self.assertEqual(build_dashboard_skill_demand([], {"python": 9}, normalize_skill), [])
+
+    def test_dashboard_omits_recent_counts_when_snapshot_is_unavailable(self):
+        rows = build_dashboard_skill_demand([["Python"]], None, normalize_skill)
+        self.assertEqual(rows, [{"Skill": "Python", "Catalog mentions": 1}])
 
     def test_deduplicates_prerequisites(self):
         dependencies = {"skill a": ["python"], "skill b": ["python"]}

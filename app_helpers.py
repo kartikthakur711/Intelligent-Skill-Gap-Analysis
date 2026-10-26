@@ -90,3 +90,26 @@ def build_learning_plan(roadmap, normalize_skill):
         phase_index = min(2, (index * 3) // total)
         phases[phase_index]["Skills"].append(skill)
     return phases
+
+
+def build_dashboard_skill_demand(catalog_skill_rows, recent_counts, normalize_skill, limit=5):
+    """Summarize observed catalog skill mentions and an optional recent snapshot."""
+    counts = {}
+    labels = {}
+    for skills in catalog_skill_rows or []:
+        for skill in skills or []:
+            label = str(skill).strip()
+            key = normalize_skill(label)
+            if not key:
+                continue
+            counts[key] = counts.get(key, 0) + 1
+            labels.setdefault(key, label)
+
+    rows = []
+    for key, count in counts.items():
+        row = {"Skill": labels[key], "Catalog mentions": count}
+        if recent_counts is not None:
+            row["Recent India listings"] = int(recent_counts.get(key, 0))
+        rows.append(row)
+    rows.sort(key=lambda row: (-row["Catalog mentions"], normalize_skill(row["Skill"])))
+    return rows[:max(0, int(limit))]

@@ -89,7 +89,7 @@ def render_sidebar():
     return page
 
 
-def render_dashboard():
+def render_dashboard(demand_rows=None, demand_metadata=None, progress_summary=None, progress_error=None):
     st.markdown('<div class="eyebrow">Career growth workspace</div>', unsafe_allow_html=True)
     st.markdown('<div class="dashboard-title">Turn your skills into your next opportunity.</div>', unsafe_allow_html=True)
     st.markdown(
@@ -129,3 +129,42 @@ def render_dashboard():
                 f'<div class="step-heading">{title}</div><div class="step-copy">{copy}</div></div>',
                 unsafe_allow_html=True,
             )
+
+    st.write("")
+    st.markdown('<div class="section-title">Your skills and learning activity</div>', unsafe_allow_html=True)
+    demand_column, progress_column = st.columns([1.15, 0.85], gap="large")
+    with demand_column:
+        st.subheader("Skills appearing in the job catalog")
+        if demand_rows:
+            st.dataframe(demand_rows, use_container_width=True, hide_index=True)
+            st.caption(
+                "Counts are skill mentions in the included catalog. Repeated or template rows can affect them; "
+                "they are not counts of distinct vacancies or hiring probabilities."
+            )
+            if demand_metadata:
+                st.caption(
+                    "Recent India listings are a separate, limited snapshot, generated "
+                    f"{demand_metadata.get('generated_at_utc', 'at an unknown time')} UTC."
+                )
+        else:
+            st.info("Skill-demand summaries are unavailable because the job catalog could not be loaded.")
+
+    with progress_column:
+        st.subheader("Saved learning progress")
+        if progress_error:
+            st.warning(f"Saved progress could not be read: {progress_error}")
+        elif progress_summary:
+            st.metric("Saved learning plans", progress_summary["saved_plan_count"])
+            st.metric("Completed step records", progress_summary["completed_step_count"])
+            if progress_summary["last_updated"]:
+                st.caption(f"Last saved: {progress_summary['last_updated']} UTC")
+            elif progress_summary["saved_plan_count"] == 0:
+                st.caption("Save progress from a personalized learning plan to see activity here.")
+            st.caption("Totals cover saved local profiles; a step saved in two plans is counted twice.")
+        else:
+            st.info("Saved learning progress is unavailable.")
+        st.button(
+            "Open resume analysis  →",
+            key="dashboard_progress_action",
+            on_click=_open_resume_analysis,
+        )

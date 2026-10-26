@@ -27,6 +27,8 @@ class AppRuntimeTests(unittest.TestCase):
             )
         )
         self.assertTrue(any("Skills appearing in the job catalog" in item.value for item in app.subheader))
+        self.assertTrue(any("Recently observed provider titles" in item.value for item in app.markdown))
+        self.assertTrue(any("does not contain a validated title aggregate yet" in item.value for item in app.info))
         self.assertTrue(any("Saved learning progress" in item.value for item in app.subheader))
         self.assertTrue(any("Saved learning plans" in metric.label for metric in app.metric))
         self.assertTrue(any("Distinct catalog titles" == metric.label and metric.value == "12" for metric in app.metric))

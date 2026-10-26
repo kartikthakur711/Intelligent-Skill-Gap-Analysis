@@ -39,17 +39,20 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: india-skill-demand-${{ github.run_id }}
-          path: build/headcount_skill_demand.csv*
+          path: |
+            build/headcount_skill_demand.csv*
+            build/headcount_job_titles.csv
           if-no-files-found: error
           retention-days: 14
       - name: Publish aggregate for the app
         if: github.ref == 'refs/heads/main'
         run: |
           cp build/headcount_skill_demand.csv data_pipeline/headcount_skill_demand.csv
+          cp build/headcount_job_titles.csv data_pipeline/headcount_job_titles.csv
           cp build/headcount_skill_demand.metadata.json data_pipeline/headcount_skill_demand.metadata.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data_pipeline/headcount_skill_demand.csv data_pipeline/headcount_skill_demand.metadata.json
+          git add data_pipeline/headcount_skill_demand.csv data_pipeline/headcount_job_titles.csv data_pipeline/headcount_skill_demand.metadata.json
           if git diff --cached --quiet; then
             echo "No aggregate changes to publish."
           else

@@ -91,7 +91,7 @@ def render_sidebar():
     return page
 
 
-def render_dashboard(demand_rows=None, demand_metadata=None, progress_summary=None, progress_error=None, snapshot_status=None, recent_demand_rows=None, role_rows=None):
+def render_dashboard(demand_rows=None, demand_metadata=None, progress_summary=None, progress_error=None, snapshot_status=None, recent_demand_rows=None, role_rows=None, recent_title_rows=None, title_metadata=None, title_status=None):
     st.markdown('<div class="eyebrow">Career growth workspace</div>', unsafe_allow_html=True)
     st.markdown('<div class="dashboard-title">Turn your skills into your next opportunity.</div>', unsafe_allow_html=True)
     st.markdown(
@@ -141,6 +141,23 @@ def render_dashboard(demand_rows=None, demand_metadata=None, progress_summary=No
         st.caption("The bundled catalog has no per-title source timestamps. Its title list is a static dataset snapshot, not a current market inventory.")
     else:
         st.info("Job-title discovery is unavailable because the bundled catalog could not be loaded.")
+    st.markdown("**Recently observed provider titles**")
+    if title_metadata is None or title_status is None or title_status["state"] == "unavailable":
+        st.info("The bundled provider snapshot does not contain a validated title aggregate yet. Titles will appear here after a successful provider refresh.")
+    else:
+        if title_status["state"] == "stale":
+            st.warning(title_status["message"])
+        if title_status["state"] == "no_listings":
+            st.info("The latest provider run found no records in its 48-hour posting window.")
+        elif recent_title_rows:
+            st.dataframe(recent_title_rows, use_container_width=True, hide_index=True)
+            st.caption(
+                f"{len(recent_title_rows)} distinct titles from the limited India posting sample, generated "
+                f"{title_metadata.get('generated_at_utc', 'at an unknown time')} UTC. Counts are distinct provider records; "
+                "title-only aggregates do not provide the skill details needed for resume analysis."
+            )
+        else:
+            st.info("The provider checked recent records but none had a usable job title.")
 
     st.write("")
     st.markdown('<div class="section-title">A clear path from experience to action</div>', unsafe_allow_html=True)

@@ -15,6 +15,8 @@ on:
       - 'job_catalog.csv'
       - 'data_pipeline/headcount_skill_demand.csv'
       - 'data_pipeline/headcount_skill_demand.metadata.json'
+      - 'data_pipeline/headcount_job_titles.csv'
+      - 'data_pipeline/skill_demand.py'
       - 'tests/test_app_runtime.py'
       - '.github/workflows/app-smoke.yml'
   pull_request:
@@ -30,6 +32,8 @@ on:
       - 'job_catalog.csv'
       - 'data_pipeline/headcount_skill_demand.csv'
       - 'data_pipeline/headcount_skill_demand.metadata.json'
+      - 'data_pipeline/headcount_job_titles.csv'
+      - 'data_pipeline/skill_demand.py'
       - 'tests/test_app_runtime.py'
       - '.github/workflows/app-smoke.yml'
 

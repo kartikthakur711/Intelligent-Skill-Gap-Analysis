@@ -1,0 +1,10 @@
+{
+  "name": "skillscope-web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": { "dev": "vite", "build": "vite build", "test": "vitest run" },
+  "dependencies": { "@vitejs/plugin-react": "latest", "vite": "latest", "typescript": "latest", "react": "latest", "react-dom": "latest", "lucide-react": "latest" },
+  "devDependencies": { "vitest": "latest", "jsdom": "latest", "@testing-library/react": "latest", "@testing-library/user-event": "latest", "@testing-library/jest-dom": "latest" }
+}
+

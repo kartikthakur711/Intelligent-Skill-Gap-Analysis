@@ -1,5 +1,59 @@
 # Intelligent Skill Gap Analysis
 
+## React application (new, optional frontend)
+
+The existing Streamlit app remains available through `app.py`. The React application in `web/` is a separate frontend served by Vite locally or as static assets in production. It talks to the FastAPI service in `api.py`; both use the existing saved model, job catalog, learning resources, recent listing aggregates, and file-backed learning progress. The compatibility feature order and score clipping remain the same as the Streamlit app. The model is loaded as-is and is never retrained or overwritten by the API.
+
+The UI exposes Overview, Resume analysis, Explore jobs, Skill gaps, Learning roadmap, and My progress. Role filters use categories actually present in `job_catalog.csv`; the data does not classify roles as technical or non-technical. Dashboard catalog mentions and recent India listing aggregates are labeled separately and are not presented as vacancy totals. Resume files are processed in memory by the API and are not written to disk. Progress keeps the existing hashed profile label and file-store behavior; this is local/single-instance convenience, not authentication or private multi-user storage.
+
+### Local setup
+
+In one terminal, install Python requirements and start the API:
+
+```sh
+python -m pip install -r requirements.txt -r requirements-api.txt
+uvicorn api:app --reload --port 8000
+```
+
+In another terminal, install the web packages and start the React app:
+
+Use Node.js 22 and pnpm 11 (enable pnpm with `corepack enable` if needed).
+
+```sh
+cd web
+pnpm install
+pnpm dev
+```
+
+Open the Vite URL shown in the terminal (normally `http://localhost:5173`). Vite proxies `/api` to `http://localhost:8000`. The first resume analysis loads `all-MiniLM-L6-v2`; allow the API runtime to download it or pre-cache the model. The uploaded resume must contain at least 50 extractable characters. Text-based PDFs work best.
+
+### Build and tests
+
+```sh
+cd web
+pnpm test
+pnpm build
+```
+
+From the repository root, run the API contract tests with:
+
+```sh
+python -B -m unittest discover -s tests -p 'test_api_contract.py' -v
+```
+
+### Deployment
+
+No deployment platform configuration exists in this repository today. Keep the current Streamlit deployment command (`python -m streamlit run app.py`) as the rollback path. For a staged React rollout, deploy `web/dist` to a static host and run `uvicorn api:app --host 0.0.0.0 --port 8000` as a separate Python service. Set `VITE_API_URL` at frontend build time to the API origin and set `SKILLSCOPE_CORS_ORIGINS` on the API to the exact static frontend origin(s), comma-separated. Keep the bundled `resume_job_ml_model.pkl`, `job_catalog.csv`, learning resources, and `data_pipeline` aggregates in the API image or mount them at the configured paths. The API loads the existing sklearn artifact and sentence model; provision a compatible Python/scikit-learn environment and cache or allow download of the sentence model before exposing the service.
+
+Install `requirements-api.txt` alongside the existing Python requirements in the API image; the Streamlit-only install can continue using `requirements.txt` unchanged. Set `LEARNING_PROGRESS_FILE` to durable storage for a single API process. The current JSON store is not shared across replicas and has no authentication; production multi-user deployment requires authenticated profiles and a shared durable storage adapter before enabling progress for multiple users. Do not expose a shared API as a private multi-user service without that work. The daily job-data GitHub Actions workflow is unchanged and continues to publish aggregate CSV snapshots. This change does not deploy, modify the existing hosted Streamlit service, change its entry point, or merge to `main`.
+
+### API contracts
+
+- `GET /api/health` reports service and bundled artifact availability.
+- `GET /api/dashboard` returns catalog roles/categories, catalog skill mentions, validated optional recent listing snapshots, and aggregate saved progress.
+- `POST /api/analyze` accepts multipart `resume`, `job_title`, and an optional `profile` (defaults to `default`); it returns the model score, descriptive signals, matched/missing skills, catalog priority, resource recommendations, prerequisite-ordered roadmap, saved completion for that profile, and the original prototype-score caveat.
+- `POST /api/progress` accepts `profile`, `job_title`, `roadmap`, and `completed_skills`, then returns the persisted completion and aggregate summary.
+
 ## Project Overview
 
 This project is an Intelligent Skill Gap Analysis and Personalized Learning Recommendation System.
@@ -170,4 +224,5 @@ After analyzing a resume, mark roadmap steps complete and select **Save progress
 The JSON file is written atomically and malformed or unsupported files are left unchanged. This file-based option is suitable for local use or a single app process with durable disk. Many hosted Streamlit environments use ephemeral filesystems, and multiple replicas may have separate files; progress can disappear on restart or differ between replicas. Before deploying there, configure `LEARNING_PROGRESS_FILE` to a durable shared store or replace the file adapter with an authenticated database-backed store. Do not treat the default file as multi-user private storage.
 
 The dashboard source paths may be overridden with `SKILLSCOPE_JOB_CATALOG`, `SKILLSCOPE_DEMAND_CSV`, and `SKILLSCOPE_DEMAND_METADATA`. Keep these files available to every app instance. A manual dashboard reload only sees files mounted in the current instance; deploy the published daily snapshot or provide a shared durable mount to keep replicas consistent. The current file-backed progress store is also local to each instance unless configured on shared durable storage.
+
 

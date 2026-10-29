@@ -47,6 +47,8 @@ jobs:
       - name: Build frontend
         working-directory: web
         run: pnpm build
+      - name: Test Node.js web server and web-only architecture
+        run: npm test
       - name: Check Python syntax
-        run: python -B -c "import ast, pathlib; files = [pathlib.Path('api.py'), pathlib.Path('app.py'), pathlib.Path('app_helpers.py'), pathlib.Path('dashboard_ui.py'), pathlib.Path('learning_progress.py'), pathlib.Path('role_discovery.py'), *pathlib.Path('data_pipeline').glob('*.py')]; [ast.parse(p.read_text(encoding='utf-8')) for p in files]; print('Python syntax OK')"
+        run: python -B -c "import ast, pathlib; files = [pathlib.Path('api.py'), pathlib.Path('app_helpers.py'), pathlib.Path('learning_progress.py'), pathlib.Path('role_discovery.py'), *pathlib.Path('data_pipeline').glob('*.py')]; [ast.parse(p.read_text(encoding='utf-8')) for p in files]; print('Python syntax OK')"
 

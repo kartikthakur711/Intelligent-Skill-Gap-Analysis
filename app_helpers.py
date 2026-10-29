@@ -1,4 +1,4 @@
-"""Small pure helpers used by the Streamlit app."""
+"""Pure analysis and roadmap helpers shared by the API and model workflows."""
 from __future__ import annotations
 
 import html

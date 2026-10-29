@@ -1,12 +1,17 @@
 {
-  "name": "Python 3",
+  "name": "SkillScope web and FastAPI",
   // Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
   "image": "mcr.microsoft.com/devcontainers/python:1-3.11-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    }
+  },
   "customizations": {
     "codespaces": {
       "openFiles": [
         "README.md",
-        "app.py"
+        "web/src/main.jsx"
       ]
     },
     "vscode": {
@@ -17,17 +22,25 @@
       ]
     }
   },
-  "updateContentCommand": "[ -f packages.txt ] && sudo apt update && sudo apt upgrade -y && sudo xargs apt install -y <packages.txt; [ -f requirements.txt ] && pip3 install --user -r requirements.txt; pip3 install --user streamlit; echo '✅ Packages installed and Requirements met'",
+  "updateContentCommand": "corepack enable && corepack prepare pnpm@11.0.0 --activate && pnpm --dir web install --frozen-lockfile && python -m pip install --user -r requirements.txt -r requirements-api.txt",
   "postAttachCommand": {
-    "server": "streamlit run app.py --server.enableCORS false --server.enableXsrfProtection false"
+    "application": "npm run dev:container"
   },
   "portsAttributes": {
-    "8501": {
-      "label": "Application",
+    "5173": {
+      "label": "SkillScope web app",
       "onAutoForward": "openPreview"
+    },
+    "3000": {
+      "label": "Node.js gateway"
+    },
+    "8000": {
+      "label": "FastAPI service"
     }
   },
   "forwardPorts": [
-    8501
+    3000,
+    5173,
+    8000
   ]
 }

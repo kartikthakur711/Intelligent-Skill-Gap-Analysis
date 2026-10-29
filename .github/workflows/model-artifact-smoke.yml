@@ -1,4 +1,4 @@
-name: App runtime smoke check
+name: Model artifact smoke check
 
 on:
   push:
@@ -6,42 +6,30 @@ on:
       - main
       - 'feature/*'
     paths:
-      - 'app.py'
+      - 'api.py'
       - 'app_helpers.py'
-      - 'dashboard_ui.py'
-      - 'learning_progress.py'
       - 'requirements.txt'
+      - 'requirements-api.txt'
       - 'resume_job_ml_model.pkl'
       - 'job_catalog.csv'
-      - 'data_pipeline/headcount_skill_demand.csv'
-      - 'data_pipeline/headcount_skill_demand.metadata.json'
-      - 'data_pipeline/headcount_job_titles.csv'
-      - 'data_pipeline/skill_demand.py'
-      - 'tests/test_app_runtime.py'
-      - '.github/workflows/app-smoke.yml'
+      - '.github/workflows/model-artifact-smoke.yml'
   pull_request:
     branches:
       - main
     paths:
-      - 'app.py'
+      - 'api.py'
       - 'app_helpers.py'
-      - 'dashboard_ui.py'
-      - 'learning_progress.py'
       - 'requirements.txt'
+      - 'requirements-api.txt'
       - 'resume_job_ml_model.pkl'
       - 'job_catalog.csv'
-      - 'data_pipeline/headcount_skill_demand.csv'
-      - 'data_pipeline/headcount_skill_demand.metadata.json'
-      - 'data_pipeline/headcount_job_titles.csv'
-      - 'data_pipeline/skill_demand.py'
-      - 'tests/test_app_runtime.py'
-      - '.github/workflows/app-smoke.yml'
+      - '.github/workflows/model-artifact-smoke.yml'
 
 permissions:
   contents: read
 
 jobs:
-  app-smoke:
+  model-artifact-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -49,9 +37,9 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
-      - name: Install app smoke dependencies
-        run: python -m pip install streamlit pandas numpy scikit-learn==1.6.1 joblib
-      - name: Load model and catalog
+      - name: Install artifact smoke dependencies
+        run: python -m pip install pandas numpy scikit-learn==1.6.1 joblib
+      - name: Load saved model and catalog
         run: |
           python - <<'PY'
           import joblib
@@ -69,7 +57,5 @@ jobs:
           required = {"job_id", "category", "job_title", "job_description", "job_skill_set"}
           assert required <= set(catalog.columns)
           assert not catalog.empty
-          print(f"Model smoke passed; catalog rows: {len(catalog)}")
+          print(f"Model artifact smoke passed; catalog rows: {len(catalog)}")
           PY
-      - name: Render initial app screen
-        run: python -B -m unittest discover -s tests -p 'test_app_runtime.py' -v

@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
+    "dev:container": "bash scripts/devcontainer-start.sh",
     "test": "node --test server/index.test.js && node scripts/check-web-only.mjs",
     "web:test": "pnpm --dir web test",
     "web:build": "pnpm --dir web build"

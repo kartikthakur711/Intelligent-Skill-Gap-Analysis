@@ -3,3 +3,7 @@ __pycache__/
 /build/
 /.venv/
 /data/learning_progress.json
+/web/node_modules/
+/web/dist/
+/.pnpm-store/
+

@@ -20,6 +20,12 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
       - name: Run offline tests
         run: python -B -m unittest discover -s data_pipeline -p 'test_*.py' -v
       - name: Run app helper tests
@@ -28,5 +34,19 @@ jobs:
         run: python -B -m unittest discover -s tests -p 'test_learning_progress.py' -v
       - name: Run role discovery tests
         run: python -B -m unittest discover -s tests -p 'test_role_discovery.py' -v
+      - name: Install API test dependencies
+        run: python -m pip install pandas numpy scikit-learn==1.6.1 joblib fastapi python-multipart
+      - name: Run API contract tests
+        run: python -B -m unittest discover -s tests -p 'test_api_contract.py' -v
+      - name: Install frontend dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+      - name: Run frontend flow tests
+        working-directory: web
+        run: pnpm test
+      - name: Build frontend
+        working-directory: web
+        run: pnpm build
       - name: Check Python syntax
-        run: python -B -c "import ast, pathlib; files = [pathlib.Path('app.py'), pathlib.Path('app_helpers.py'), pathlib.Path('dashboard_ui.py'), pathlib.Path('learning_progress.py'), pathlib.Path('role_discovery.py'), *pathlib.Path('data_pipeline').glob('*.py')]; [ast.parse(p.read_text(encoding='utf-8')) for p in files]; print('Python syntax OK')"
+        run: python -B -c "import ast, pathlib; files = [pathlib.Path('api.py'), pathlib.Path('app.py'), pathlib.Path('app_helpers.py'), pathlib.Path('dashboard_ui.py'), pathlib.Path('learning_progress.py'), pathlib.Path('role_discovery.py'), *pathlib.Path('data_pipeline').glob('*.py')]; [ast.parse(p.read_text(encoding='utf-8')) for p in files]; print('Python syntax OK')"
+

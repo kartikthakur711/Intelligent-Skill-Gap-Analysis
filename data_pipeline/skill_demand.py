@@ -36,6 +36,14 @@ def load_headcount_demand(
             parsed = datetime.fromisoformat(value)
             if parsed.tzinfo is None:
                 return None, None
+        if metadata.get("stale") is True:
+            for name in ("fallback_at_utc", "source_snapshot_generated_at_utc"):
+                value = str(metadata.get(name, "")).replace("Z", "+00:00")
+                parsed = datetime.fromisoformat(value)
+                if parsed.tzinfo is None:
+                    return None, None
+        elif metadata.get("fallback") is True:
+            return None, None
         for name in ("api_records", "processed_jobs", "category_skill_pairs"):
             if int(metadata[name]) < 0:
                 return None, None
@@ -97,6 +105,14 @@ def load_headcount_titles(
             parsed = datetime.fromisoformat(value)
             if parsed.tzinfo is None:
                 return None, None
+        if metadata.get("stale") is True:
+            for name in ("fallback_at_utc", "source_snapshot_generated_at_utc"):
+                value = str(metadata.get(name, "")).replace("Z", "+00:00")
+                parsed = datetime.fromisoformat(value)
+                if parsed.tzinfo is None:
+                    return None, None
+        elif metadata.get("fallback") is True:
+            return None, None
         for name in ("api_records", "processed_jobs", "distinct_title_count"):
             if int(metadata[name]) < 0:
                 return None, None

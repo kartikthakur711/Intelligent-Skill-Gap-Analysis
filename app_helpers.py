@@ -146,7 +146,11 @@ def summarize_recent_snapshot(rows, metadata, now=None, stale_after_hours=36):
             "age_hours": None,
         }
 
-    if age_hours >= stale_after_hours:
+    if metadata.get("stale") is True:
+        state = "stale"
+        source_time = metadata.get("source_snapshot_generated_at_utc", metadata.get("generated_at_utc"))
+        message = f"The refresh failed; showing the last validated snapshot from {source_time}. Its counts are historical context."
+    elif age_hours >= stale_after_hours:
         state = "stale"
         message = f"Snapshot is {age_hours:.0f} hours old, beyond the {stale_after_hours}-hour freshness window. Its recorded counts are shown as historical context."
     elif api_records == 0:

@@ -148,7 +148,7 @@ class HeadcountImporterTests(unittest.TestCase):
     def test_exhausted_transient_retries_fail_honestly(self):
         error = HTTPError("https://api.example.invalid", 504, "timeout", {}, None)
         with patch.object(importer, "urlopen", side_effect=[error] * importer.MAX_REQUEST_ATTEMPTS) as request, patch.object(importer.time, "sleep"), patch.object(importer.random, "uniform", return_value=1.0):
-            with self.assertRaisesRegex(RuntimeError, "HTTP 504"):
+            with self.assertRaisesRegex(importer.TransientAPIError, "HTTP 504"):
                 importer.request_page({"country": "IN"}, "unused-test-token")
         self.assertEqual(request.call_count, importer.MAX_REQUEST_ATTEMPTS)
 
@@ -173,6 +173,38 @@ class HeadcountImporterTests(unittest.TestCase):
                 importer.run(self.catalog, self.output, api_key="unused-test-token", posted_since="2026-10-22T00:00:00Z")
         self.assertEqual(self.output.read_text(encoding="utf-8"), original_csv)
         self.assertEqual(metadata_path.read_text(encoding="utf-8"), original_metadata)
+
+    def test_fallback_preserves_snapshot_data_and_marks_original_timestamp_stale(self):
+        source = self.root / "previous"
+        source.mkdir()
+        source_csv = "category,skill,distinct_job_count,window_start_utc,generated_at_utc\nAI,python,1,2026-10-22T00:00:00Z,2026-10-24T00:00:00Z\n"
+        source_titles = "job_title,distinct_job_count,window_start_utc,generated_at_utc\nEngineer,1,2026-10-22T00:00:00Z,2026-10-24T00:00:00Z\n"
+        source_meta = {"generated_at_utc":"2026-10-24T00:00:00Z", "window_start_utc":"2026-10-22T00:00:00Z", "api_records":1, "processed_jobs":1, "category_skill_pairs":1, "distinct_title_count":1}
+        (source / "headcount_skill_demand.csv").write_text(source_csv, encoding="utf-8")
+        (source / "headcount_job_titles.csv").write_text(source_titles, encoding="utf-8")
+        (source / "headcount_skill_demand.metadata.json").write_text(json.dumps(source_meta), encoding="utf-8")
+        report = importer.copy_last_known_good(source, self.output, failure="Headcount API returned HTTP 504")
+        self.assertEqual(self.output.read_text(encoding="utf-8"), source_csv)
+        self.assertEqual(self.output.with_name("headcount_job_titles.csv").read_text(encoding="utf-8"), source_titles)
+        metadata = json.loads(self.output.with_suffix(".metadata.json").read_text(encoding="utf-8"))
+        self.assertEqual(metadata["generated_at_utc"], "2026-10-24T00:00:00Z")
+        self.assertEqual(metadata["source_snapshot_generated_at_utc"], "2026-10-24T00:00:00Z")
+        self.assertTrue(metadata["stale"])
+        self.assertTrue(metadata["fallback"])
+        self.assertEqual(report["status"], "stale_fallback")
+        rows, loaded = load_headcount_demand(self.output, importer.normalize)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(loaded["stale"], "True")
+
+    def test_fallback_fails_clearly_without_valid_previous_snapshot(self):
+        with self.assertRaisesRegex(RuntimeError, "no valid previous aggregate snapshot"):
+            importer.copy_last_known_good(self.root / "missing", self.output, failure="Headcount API returned HTTP 504")
+        self.assertFalse(self.output.exists())
+
+    def test_cli_routes_exhausted_transient_outage_to_fallback(self):
+        with patch.object(importer.sys, "argv", ["headcount_importer.py", "--fallback-dir", str(self.root)]), patch.object(importer, "run", side_effect=importer.TransientAPIError("Headcount API returned HTTP 504")), patch.object(importer, "copy_last_known_good", return_value={"status": "stale_fallback"}) as fallback:
+            self.assertEqual(importer.main(), 0)
+        fallback.assert_called_once_with(self.root, Path("build/headcount_skill_demand.csv"), failure="Headcount API returned HTTP 504")
 
     def test_requires_secret_without_showing_it(self):
         with self.assertRaisesRegex(ValueError, "HEADCOUNT_API_KEY is required"):

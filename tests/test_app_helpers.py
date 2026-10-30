@@ -62,6 +62,15 @@ class DashboardDataTests(unittest.TestCase):
         self.assertEqual(stale["state"], "stale")
         self.assertEqual(malformed["state"], "unavailable")
 
+    def test_explicit_fallback_is_stale_even_inside_freshness_window(self):
+        status = summarize_recent_snapshot(
+            [{"category": "AI", "skill_normalized": "python", "distinct_job_count": "1"}],
+            {"generated_at_utc": "2026-10-30T08:00:00Z", "api_records": "1", "processed_jobs": "1", "stale": True, "source_snapshot_generated_at_utc": "2026-10-30T08:00:00Z"},
+            now=datetime(2026, 10, 30, 9, tzinfo=timezone.utc),
+        )
+        self.assertEqual(status["state"], "stale")
+        self.assertIn("last validated snapshot", status["message"])
+
     def test_catalog_mentions_are_normalized_ranked_and_joined_to_recent_counts(self):
         rows = build_dashboard_skill_demand(
             [["Python", "SQL"], ["python", "Pandas"], ["SQL"]],

@@ -38,6 +38,10 @@ TRANSIENT_HTTP_CODES = {408, 429, 500, 502, 503, 504}
 LOGGER = logging.getLogger(__name__)
 
 
+class TransientAPIError(RuntimeError):
+    """An upstream failure that exhausted the configured retry policy."""
+
+
 def normalize(value: object) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip().lower().replace(".", "").replace("-", " ")
 
@@ -106,7 +110,8 @@ def request_page(params: dict[str, str], api_key: str, timeout: int = REQUEST_TI
             # Never include response text or request headers: either could contain secrets.
             if exc.code not in TRANSIENT_HTTP_CODES or attempt == MAX_REQUEST_ATTEMPTS:
                 LOGGER.error("Headcount request failed with HTTP %s (attempt %s/%s)", exc.code, attempt, MAX_REQUEST_ATTEMPTS)
-                raise RuntimeError(f"Headcount API returned HTTP {exc.code}") from None
+                error = TransientAPIError if exc.code in TRANSIENT_HTTP_CODES else RuntimeError
+                raise error(f"Headcount API returned HTTP {exc.code}") from None
             retry_after = retry_after_seconds(exc.headers.get("Retry-After") if exc.headers else None)
             delay = min(RETRY_MAX_SECONDS, retry_after) if retry_after is not None else min(RETRY_MAX_SECONDS, RETRY_BASE_SECONDS * (2 ** (attempt - 1))) * random.uniform(0.5, 1.5)
             LOGGER.warning("Headcount returned HTTP %s; retrying in %.1f seconds (attempt %s/%s)", exc.code, delay, attempt, MAX_REQUEST_ATTEMPTS)
@@ -115,7 +120,7 @@ def request_page(params: dict[str, str], api_key: str, timeout: int = REQUEST_TI
         except (URLError, TimeoutError, socket.timeout, ConnectionError) as exc:
             if attempt == MAX_REQUEST_ATTEMPTS:
                 LOGGER.error("Headcount request failed after %s attempts (%s)", MAX_REQUEST_ATTEMPTS, type(exc).__name__)
-                raise RuntimeError(f"Headcount API request failed after {MAX_REQUEST_ATTEMPTS} attempts ({type(exc).__name__})") from None
+                raise TransientAPIError(f"Headcount API request failed after {MAX_REQUEST_ATTEMPTS} attempts ({type(exc).__name__})") from None
             delay = min(RETRY_MAX_SECONDS, RETRY_BASE_SECONDS * (2 ** (attempt - 1))) * random.uniform(0.5, 1.5)
             LOGGER.warning("Headcount request timed out or failed (%s); retrying in %.1f seconds (attempt %s/%s)", type(exc).__name__, delay, attempt, MAX_REQUEST_ATTEMPTS)
             time.sleep(delay)
@@ -259,15 +264,58 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=Path("build/headcount_skill_demand.csv"))
     parser.add_argument("--posted-since", help="RFC 3339 timestamp; defaults to 48 hours ago")
     parser.add_argument("--max-records", type=int, default=250)
+    parser.add_argument("--fallback-dir", type=Path, help="Use a validated prior snapshot after exhausted transient API failures")
     args = parser.parse_args()
     since = args.posted_since or (datetime.now(timezone.utc) - timedelta(hours=48)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     try:
         report = run(args.catalog, args.output, api_key=os.environ.get("HEADCOUNT_API_KEY", ""), posted_since=since, max_records=args.max_records)
+    except TransientAPIError as exc:
+        if not args.fallback_dir:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 2
+        try:
+            report = copy_last_known_good(args.fallback_dir, args.output, failure=str(exc))
+        except (OSError, ValueError, RuntimeError) as fallback_exc:
+            print(f"ERROR: {fallback_exc}", file=sys.stderr)
+            return 2
     except (OSError, ValueError, RuntimeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
     print(json.dumps(report, sort_keys=True))
     return 0
+
+
+def copy_last_known_good(snapshot_dir: Path, output_path: Path, *, failure: str) -> dict[str, str]:
+    """Copy a validated snapshot and annotate its metadata as stale fallback."""
+    from skill_demand import load_headcount_demand, load_headcount_titles
+
+    source_demand = snapshot_dir / "headcount_skill_demand.csv"
+    source_titles = snapshot_dir / "headcount_job_titles.csv"
+    source_metadata = snapshot_dir / "headcount_skill_demand.metadata.json"
+    demand_rows, metadata = load_headcount_demand(source_demand, normalize, source_metadata)
+    title_rows, title_metadata = load_headcount_titles(source_titles, source_metadata)
+    if demand_rows is None or title_rows is None or metadata is None or title_metadata is None:
+        raise RuntimeError("Cannot use stale fallback: no valid previous aggregate snapshot exists")
+    if metadata.get("generated_at_utc") != title_metadata.get("generated_at_utc"):
+        raise RuntimeError("Cannot use stale fallback: aggregate and title snapshots do not match")
+    if int(metadata.get("api_records", "0")) < 1 or int(metadata.get("distinct_title_count", "0")) < 1:
+        raise RuntimeError("Cannot use stale fallback: previous snapshot contains no validated source records")
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_titles = output_path.with_name("headcount_job_titles.csv")
+    output_metadata = output_path.with_suffix(".metadata.json")
+    output_path.write_bytes(source_demand.read_bytes())
+    output_titles.write_bytes(source_titles.read_bytes())
+    preserved = json.loads(source_metadata.read_text(encoding="utf-8"))
+    preserved.update({
+        "stale": True,
+        "fallback": True,
+        "fallback_at_utc": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "fallback_reason": failure,
+        "source_snapshot_generated_at_utc": metadata["generated_at_utc"],
+    })
+    output_metadata.write_text(json.dumps(preserved, sort_keys=True) + "\n", encoding="utf-8")
+    return {"status": "stale_fallback", "source_snapshot_generated_at_utc": metadata["generated_at_utc"]}
 
 
 if __name__ == "__main__":

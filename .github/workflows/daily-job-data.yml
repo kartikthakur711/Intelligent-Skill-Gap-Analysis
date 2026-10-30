@@ -34,7 +34,7 @@ jobs:
       - name: Build bounded aggregate
         env:
           HEADCOUNT_API_KEY: ${{ secrets.HEADCOUNT_API_KEY }}
-        run: python data_pipeline/headcount_importer.py --catalog job_catalog.csv --output build/headcount_skill_demand.csv --max-records 250
+        run: python data_pipeline/headcount_importer.py --catalog job_catalog.csv --output build/headcount_skill_demand.csv --fallback-dir data_pipeline --max-records 250
       - name: Upload aggregate
         uses: actions/upload-artifact@v7
         with:
